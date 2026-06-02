@@ -26,10 +26,23 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
 - [x] T2.1 `templates/report_skeleton_sql.rdl` (sanitized, placeholder conn)
 - [x] T2.2 `report_builder.create_report(source_type in {fabric,sql})` + QueryParameters + ReportParameters
 - [x] T2.3 Registered in `server.py` (16 tools); exported in `__init__`
-- [~] T2.4 Automated: validate_rdl=valid (warn: No Tablix), MCP stdio smoke OK, 5 pytest pass.
-      **PENDING USER:** open a generated .rdl in Power BI Report Builder to confirm it loads
-      + dataset query returns rows. (Body is empty by design until visual phases.)
-      Also fixed: validate_rdl now treats "No Tablix" as a warning, not a failure.
+- [x] T2.4 Opens cleanly in Report Builder (after empty-ReportItems fix); conn string +
+      dataset SQL present. validate_rdl=valid, MCP stdio smoke OK, 7 pytest pass. ✓ SIGNED OFF
+
+## Phase T — Template mode (user priority: build before Phase 3)
+Start from full styled archetypes (cloned + rebound) rather than bare skeletons. First
+archetype: **styled flat table** (distilled from `Raw Enrollment Revenue.rdl`). Templates
+live in `rdl_report_mcp/templates/library/<name>/` = `template.rdl` + `manifest.json` (slots).
+Rebind via ElementTree (swap datasource/dataset, stamp one styled column per field from a
+prototype cell). Sanitized: placeholder connection strings only.
+- [x] TT.1 Library layout `templates/library/<name>/{template.rdl,manifest.json}` + manifest schema
+- [x] TT.2 Distilled `styled_flat_table` (sanitized; #305496 header band, prototype cells)
+- [x] TT.3 `templates_lib.py` engine: load template, clone prototype cells, stamp N columns
+- [x] TT.4 `create_report_from_template(...)` (reuses Phase 2 _add_datasource/_add_dataset)
+- [x] TT.5 `list_templates()` + both tools registered (18 total); exported
+- [~] TT.6 Automated: 12 pytest pass, validate=valid, MCP stdio smoke OK (styling/bindings/
+      unique names verified). **PENDING USER:** open a template-generated .rdl in Report
+      Builder — should render the styled table (this one has a tablix, unlike Phase 2).
 
 ## Phase 3 — create_report (DAX) + add_dataset
 - [ ] T3.1 `templates/report_skeleton_dax.rdl`
@@ -74,4 +87,7 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
 - 2026-06-02: Report Builder REJECTED v1 skeleton: empty `<ReportItems/>` = "incomplete
   content". Fix: omit ReportItems for empty body (it's minOccurs=0); added validate_rdl rule
   to flag empty ReportItems; +2 regression tests (7 total pass). Awaiting user retest (T2.4).
-- Next: Phase 3 — DAX skeleton + DAX branch of create_report + add_dataset.
+- 2026-06-02: Phase T (template mode) built — styled_flat_table archetype + manifest,
+  templates_lib engine (clone prototype cells, stamp 1 styled column/field), list_templates +
+  create_report_from_template tools (18 total), 12 tests pass. Awaiting user RB check (TT.6).
+- Next: TT.6 user verify, then Phase 3 (DAX) — which also gives template mode DAX for free.

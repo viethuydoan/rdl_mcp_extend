@@ -15,7 +15,13 @@ packages = ["rdl_report_mcp"]
 py-modules = ["rdl_report_mcp_server"]
 
 [tool.setuptools.package-data]
-rdl_report_mcp = ["templates/*.rdl", "templates/*.xml", "templates/fragments/*.xml"]
+rdl_report_mcp = [
+    "templates/*.rdl",
+    "templates/*.xml",
+    "templates/fragments/*.xml",
+    "templates/library/*/template.rdl",
+    "templates/library/*/manifest.json",
+]
 
 [project.scripts]
 rdl-report-mcp = "rdl_report_mcp_server:main"

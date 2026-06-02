@@ -11,6 +11,7 @@ from . import datasets
 from . import parameters
 from . import validation
 from . import report_builder
+from . import templates_lib
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,14 @@ class MCPServer:
             'create_report': {
                 'function': self.create_report,
                 'description': 'Create a new paginated report from scratch with a SQL-style data source (Fabric SQL endpoint or SQL Server) and one embedded T-SQL dataset'
+            },
+            'list_templates': {
+                'function': self.list_templates,
+                'description': 'List available styled report templates (archetypes) that create_report_from_template can use'
+            },
+            'create_report_from_template': {
+                'function': self.create_report_from_template,
+                'description': 'Create a new report by cloning a styled template (e.g. styled_flat_table) and rebinding its data source, dataset, and columns to the supplied fields'
             },
             'describe_rdl_report': {
                 'function': self.describe_rdl_report,
@@ -229,6 +238,62 @@ class MCPServer:
                 },
                 'required': ['filepath', 'title', 'source_type', 'connection', 'dataset_name', 'query', 'fields']
             },
+            'list_templates': {
+                'type': 'object',
+                'properties': {}
+            },
+            'create_report_from_template': {
+                'type': 'object',
+                'properties': {
+                    'filepath': {'type': 'string', 'description': 'Output path for the new .rdl file'},
+                    'template': {'type': 'string', 'description': 'Template name from list_templates (e.g. styled_flat_table)'},
+                    'title': {'type': 'string', 'description': 'Report title'},
+                    'source_type': {'type': 'string', 'enum': ['fabric', 'sql'], 'description': "'fabric' = Fabric SQL endpoint; 'sql' = SQL Server"},
+                    'connection': {
+                        'type': 'object',
+                        'description': "Either {connect_string} or {data_source, initial_catalog}; optional {name}",
+                        'properties': {
+                            'data_source': {'type': 'string'},
+                            'initial_catalog': {'type': 'string'},
+                            'connect_string': {'type': 'string'},
+                            'name': {'type': 'string'}
+                        }
+                    },
+                    'dataset_name': {'type': 'string'},
+                    'query': {'type': 'string', 'description': 'Embedded T-SQL CommandText'},
+                    'fields': {
+                        'type': 'array',
+                        'description': 'One styled column is stamped per field',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'label': {'type': 'string', 'description': 'Column header (defaults to name)'},
+                                'data_field': {'type': 'string'},
+                                'type_name': {'type': 'string'},
+                                'width': {'type': 'string', 'description': "Column width e.g. '1.5in' (default from template)"},
+                                'format': {'type': 'string', 'description': 'Format string e.g. N0, MM/dd/yyyy'}
+                            },
+                            'required': ['name']
+                        }
+                    },
+                    'parameters': {
+                        'type': 'array',
+                        'description': 'Optional report parameters (also wired as @name QueryParameters)',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'data_type': {'type': 'string'},
+                                'prompt': {'type': 'string'},
+                                'default': {}
+                            },
+                            'required': ['name']
+                        }
+                    }
+                },
+                'required': ['filepath', 'template', 'title', 'source_type', 'connection', 'dataset_name', 'query', 'fields']
+            },
             'describe_rdl_report': {
                 'type': 'object',
                 'properties': {
@@ -378,6 +443,17 @@ class MCPServer:
                       fields: list, parameters: Optional[list] = None) -> Dict[str, Any]:
         return report_builder.create_report(filepath, title, source_type, connection,
                                             dataset_name, query, fields, parameters)
+
+    def list_templates(self) -> Dict[str, Any]:
+        return templates_lib.list_templates()
+
+    def create_report_from_template(self, filepath: str, template: str, title: str,
+                                    source_type: str, connection: Dict[str, Any],
+                                    dataset_name: str, query: str, fields: list,
+                                    parameters: Optional[list] = None) -> Dict[str, Any]:
+        return templates_lib.create_report_from_template(filepath, template, title, source_type,
+                                                         connection, dataset_name, query, fields,
+                                                         parameters)
 
     def describe_rdl_report(self, filepath: str) -> Dict[str, Any]:
         return reader.describe_rdl_report(filepath)
