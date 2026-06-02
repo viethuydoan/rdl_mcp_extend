@@ -157,6 +157,12 @@ def validate_rdl(filepath: str) -> Dict[str, Any]:
         if not tablixes:
             warnings.append('No Tablix (table) found')
 
+        # An empty <ReportItems> is rejected by SSRS ("incomplete content"): it must hold at
+        # least one report item, or be omitted entirely. Catch it before Report Builder does.
+        for report_items in root.findall(f'.//{ns}ReportItems'):
+            if len(list(report_items)) == 0:
+                issues.append('Empty ReportItems element — must contain at least one item or be omitted')
+
         # Validate field references in each Tablix
         for tablix in tablixes:
             tablix_name = tablix.get('Name', 'Unknown')

@@ -71,3 +71,24 @@ def test_explicit_connect_string_override(tmp_path):
 def test_unknown_source_type_fails(tmp_path):
     _, res = _make(tmp_path, 'oracle')
     assert res['success'] is False
+
+
+def test_no_empty_report_items(tmp_path):
+    """SSRS rejects an empty <ReportItems/>; an empty body must omit it entirely."""
+    fp, _ = _make(tmp_path, 'fabric')
+    root = ET.parse(fp).getroot()
+    body = root.find(f'.//{NS}Body')
+    assert body.find(f'{NS}ReportItems') is None
+
+
+def test_validate_flags_empty_report_items(tmp_path):
+    """The validator should catch an empty ReportItems before Report Builder does."""
+    fp, _ = _make(tmp_path, 'fabric')
+    # craft a broken copy with an empty ReportItems injected into the body
+    broken = str(tmp_path / 'broken.rdl')
+    with open(broken, 'w', encoding='utf-8') as f:
+        f.write(open(fp, encoding='utf-8').read().replace(
+            '<Body>\n        <Height>', '<Body>\n        <ReportItems />\n        <Height>'))
+    res = validation.validate_rdl(broken)
+    assert res['valid'] is False
+    assert any('Empty ReportItems' in i for i in res['issues'])

@@ -70,5 +70,8 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
   `write_xml` was emitting `<ns0:Report>` and dropping default `xmlns`; now registers the
   default ns with empty prefix so RDL round-trips cleanly. Prereq for all generation.
 - 2026-06-02: Phase 2 built — `create_report` (fabric/sql) + skeleton + server wiring + 5
-  tests. validate_rdl "No Tablix" downgraded to warning. Awaiting user Report Builder check (T2.4).
+  tests. validate_rdl "No Tablix" downgraded to warning.
+- 2026-06-02: Report Builder REJECTED v1 skeleton: empty `<ReportItems/>` = "incomplete
+  content". Fix: omit ReportItems for empty body (it's minOccurs=0); added validate_rdl rule
+  to flag empty ReportItems; +2 regression tests (7 total pass). Awaiting user retest (T2.4).
 - Next: Phase 3 — DAX skeleton + DAX branch of create_report + add_dataset.
