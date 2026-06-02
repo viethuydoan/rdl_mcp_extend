@@ -47,8 +47,18 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
       `_find_tablix`, `_set_region_dataset`); single-region path unchanged.
 - [x] TMT.3 New `create_composite_report_from_template(datasets[], regions{})` tool (19 total);
       manifest structure=composite with regions{matrix,table}. 22 tests pass; MCP smoke OK.
-- [~] TMT.4 **PENDING USER:** open a composite-generated .rdl in Report Builder → matrix on
-      top + detail table below, both bound.
+- [x] TMT.4 Verified in Report Builder — matrix on top + detail table below, both bound. ✓ SIGNED OFF.
+
+## Phase TMM — matrix_and_matrix_paged (2nd matrix breaks to 1 Excel sheet per Category/region)
+RDL mechanism: page-break group = Group with <PageBreak><BreakLocation>Between</BreakLocation></PageBreak>
++ dynamic <PageName>=Fields!Category.Value</PageName> (Excel renderer names each worksheet from PageName).
+- [x] TMM.1 User authored matrix_and_matrix_paged.rdl + verified Excel export (1 sheet per category)
+- [x] TMM.2 Distilled (sanitized-copy of the working file) into matrix_and_matrix_paged template +
+      composite manifest. Matrix2: Category = pagination-only group (PageBreak Between + PageName,
+      no header) + RowCat1 visible inner. `_rebind_group` now rebinds PageName + tolerates header-less
+      groups. PageBreak/PageName baked in template; engine only swaps the field. 5 archetypes total.
+- [~] TMM.3 23 tests pass (incl. PageName/PageBreak rebind), validate OK. **PENDING USER:** open in
+      Report Builder + Export to Excel → one sheet per category.
 
 ## Phase TMG — matrix_grouped (nested row groups)
 - [x] TMG.1 Distilled `matrix_grouped` from user-authored `minimal_matrix_grouped.rdl`

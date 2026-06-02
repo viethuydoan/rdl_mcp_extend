@@ -181,10 +181,16 @@ def _rebind_group(hierarchy: ET.Element, ns: str, slot: Dict[str, Any], field: s
     sort_val = member.find(f'{ns}SortExpressions/{ns}SortExpression/{ns}Value')
     if sort_val is not None:
         sort_val.text = expr
-    # Header textbox names are unique, so a hierarchy-wide lookup is unambiguous.
-    header = hierarchy.find(f".//{ns}Textbox[@Name='{slot['header_textbox']}']")
-    if header is not None:
-        _set_value_text(header, ns, expr)
+    # If this group drives pagination (Excel one-sheet-per-value), keep its PageName in sync.
+    page_name = member.find(f'{ns}Group/{ns}PageName')
+    if page_name is not None:
+        page_name.text = expr
+    # A pagination-only group may have no header textbox; rebind it only if present.
+    header_name = slot.get('header_textbox')
+    if header_name:
+        header = hierarchy.find(f".//{ns}Textbox[@Name='{header_name}']")
+        if header is not None:
+            _set_value_text(header, ns, expr)
 
 
 def _set_region_dataset(root: ET.Element, ns: str, tablix_name: str, dataset_name: str) -> None:

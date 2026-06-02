@@ -1,0 +1,37 @@
+{
+  "name": "matrix_and_matrix_paged",
+  "title": "Matrix + Paged Matrix (one Excel sheet per category)",
+  "description": "A composite report with two matrices. The first (summary) matrix is bound to SummaryData. The second matrix is bound to CategoryData and BREAKS INTO ONE EXCEL WORKSHEET PER CATEGORY: its outer 'Category' group has a page break (Between) + dynamic PageName, and the tablix starts on a new page. Category is a pagination-only group (no visible row header); RowCat1 is the visible inner row group. Use create_composite_report_from_template with regions {matrix, paged_matrix}.",
+  "category": "composite",
+  "structure": "composite",
+  "page_unit": "Mm",
+  "datasets": ["SummaryData", "CategoryData"],
+  "regions": {
+    "matrix": {
+      "kind": "matrix",
+      "tablix_name": "Tablix1",
+      "dataset": "SummaryData",
+      "slots": {
+        "row_group": {"group": "RowCat", "header_textbox": "RowCat"},
+        "column_group": {"group": "ColCat", "header_textbox": "ColCat"},
+        "value": {"value_textbox": "Val", "default_aggregate": "Sum"}
+      }
+    },
+    "paged_matrix": {
+      "kind": "matrix",
+      "tablix_name": "Tablix2",
+      "dataset": "CategoryData",
+      "slots": {
+        "row_groups": [
+          {"group": "Category", "header_textbox": null, "page_name": true,
+           "desc": "Pagination-only group: one Excel sheet per distinct value (PageBreak + PageName)."},
+          {"group": "RowCat1", "header_textbox": "RowCat1",
+           "desc": "Visible inner row group shown within each category's sheet."}
+        ],
+        "column_group": {"group": "ColCat1", "header_textbox": "ColCat1"},
+        "value": {"value_textbox": "Val1", "default_aggregate": "Sum"}
+      }
+    }
+  },
+  "bindings_note": "paged_matrix.bindings.row_groups = [category_field (drives sheets), inner_row_field]. The category field is auto-applied to the group PageName so each sheet is named by it."
+}

@@ -206,3 +206,39 @@ def test_composite_missing_dataset_fails(tmp_path):
 def test_composite_rejects_single_region_template(tmp_path):
     _, res = _make_composite(tmp_path, template='simple_matrix')
     assert res['success'] is False and 'composite' in res['message'].lower()
+
+
+# --- paged composite (matrix + matrix, one Excel sheet per category) ---
+
+def test_paged_matrix_rebinds_pagename_and_keeps_breaks(tmp_path):
+    fp = str(tmp_path / 'paged.rdl')
+    res = templates_lib.create_composite_report_from_template(
+        filepath=fp, template='matrix_and_matrix_paged', title='P', source_type='fabric',
+        connection={'name': 'ds', 'data_source': 's', 'initial_catalog': 'd'},
+        datasets=[
+            {'name': 'SummaryData', 'query': 'SELECT r,c,v FROM t',
+             'fields': [{'name': 'r'}, {'name': 'c'}, {'name': 'v', 'type_name': 'System.Decimal'}]},
+            {'name': 'CategoryData', 'query': 'SELECT cat,r,c,v FROM t',
+             'fields': [{'name': 'cat'}, {'name': 'r'}, {'name': 'c'}, {'name': 'v', 'type_name': 'System.Decimal'}]},
+        ],
+        regions={
+            'matrix': {'bindings': {'row_group': 'r', 'column_group': 'c', 'value': 'v'}},
+            'paged_matrix': {'bindings': {'row_groups': ['cat', 'r'], 'column_group': 'c', 'value': 'v'}},
+        })
+    assert res['success'], res['message']
+    root = ET.parse(fp).getroot()
+    t2 = root.find(f".//{NS}Tablix[@Name='Tablix2']")
+    # The Category (pagination) group: expression + PageName both rebound to 'cat'
+    cat = None
+    for m in t2.iter(f'{NS}TablixMember'):
+        g = m.find(f'{NS}Group')
+        if g is not None and g.get('Name') == 'Category':
+            cat = m
+            break
+    assert cat is not None
+    assert cat.find(f'{NS}Group/{NS}GroupExpressions/{NS}GroupExpression').text == '=Fields!cat.Value'
+    assert cat.find(f'{NS}Group/{NS}PageName').text == '=Fields!cat.Value'
+    assert cat.find(f'{NS}Group/{NS}PageBreak/{NS}BreakLocation').text == 'Between'
+    # Tablix starts on a new page (sheet) after matrix 1
+    assert t2.find(f'{NS}PageBreak/{NS}BreakLocation').text == 'Start'
+    assert validation.validate_rdl(fp)['valid'] is True
