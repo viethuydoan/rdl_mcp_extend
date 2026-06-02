@@ -108,3 +108,52 @@ def test_matrix_missing_bindings_fails(tmp_path):
         connection={'name': 'd', 'data_source': 's', 'initial_catalog': 'd'},
         dataset_name='data', query='SELECT 1', fields=[{'name': 'r'}], bindings=None)
     assert res['success'] is False and 'bindings' in res['message'].lower()
+
+
+# --- grouped (nested row groups) matrix template ---
+
+def _make_grouped(tmp_path, **over):
+    fp = str(tmp_path / 'grouped.rdl')
+    args = dict(
+        filepath=fp, template='matrix_grouped', title='G', source_type='fabric',
+        connection={'name': 'ds', 'data_source': 'srv', 'initial_catalog': 'db'},
+        dataset_name='data', query='SELECT r1, r2, c, v FROM t',
+        fields=[{'name': 'r1'}, {'name': 'r2'}, {'name': 'c'},
+                {'name': 'v', 'type_name': 'System.Decimal'}],
+        bindings={'row_groups': ['r1', 'r2'], 'column_group': 'c', 'value': 'v',
+                  'aggregate': 'Sum', 'row_group_labels': ['Region', 'Facility']},
+    )
+    args.update(over)
+    return fp, templates_lib.create_report_from_template(**args)
+
+
+def test_grouped_nested_row_groups_independent_sorts(tmp_path):
+    fp, res = _make_grouped(tmp_path)
+    assert res['success'], res['message']
+    root = ET.parse(fp).getroot()
+    rh = root.find(f'.//{NS}TablixRowHierarchy')
+    # Each row-group member must carry its OWN group + sort expression (no cross-contamination)
+    pairs = {}
+    for m in rh.iter(f'{NS}TablixMember'):
+        g = m.find(f'{NS}Group')
+        if g is None:
+            continue
+        ge = m.find(f'{NS}Group/{NS}GroupExpressions/{NS}GroupExpression').text
+        sv = m.find(f'{NS}SortExpressions/{NS}SortExpression/{NS}Value').text
+        pairs[g.get('Name')] = (ge, sv)
+    assert pairs['RowGroupOuter'] == ('=Fields!r1.Value', '=Fields!r1.Value')
+    assert pairs['RowGroupInner'] == ('=Fields!r2.Value', '=Fields!r2.Value')
+    assert validation.validate_rdl(fp)['valid'] is True
+
+
+def test_grouped_corner_labels_and_value(tmp_path):
+    fp, _ = _make_grouped(tmp_path)
+    corner_vals = [t.find(f'.//{NS}Value').text
+                   for t in ET.parse(fp).getroot().findall(f'.//{NS}TablixCorner//{NS}Textbox')]
+    assert corner_vals == ['Region', 'Facility']
+    assert '=Sum(Fields!v.Value)' in open(fp, encoding='utf-8').read()
+
+
+def test_grouped_wrong_row_group_count_fails(tmp_path):
+    _, res = _make_grouped(tmp_path, bindings={'row_groups': ['r1'], 'column_group': 'c', 'value': 'v'})
+    assert res['success'] is False and 'row group' in res['message'].lower()

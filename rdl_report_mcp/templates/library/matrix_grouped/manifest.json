@@ -1,0 +1,26 @@
+{
+  "name": "matrix_grouped",
+  "title": "Grouped Matrix (nested rows)",
+  "description": "A pivot matrix with TWO nested row groups (an outer group and an inner subgroup) down the left, one column group across the top, and one aggregated value in the cells. Column header + corner band styled #305496 / white SemiBold. Bind row_groups=[outer, inner], a column_group, and a value. Distilled from a Report Builder-authored nested matrix.",
+  "category": "matrix",
+  "structure": "matrix",
+  "page_unit": "Mm",
+  "supported_sources": ["fabric", "sql", "dax"],
+  "tablix_name": "Tablix1",
+  "slots": {
+    "row_groups": [
+      {"group": "RowGroupOuter", "header_textbox": "RowHeaderOuter", "corner_textbox": "CornerOuter"},
+      {"group": "RowGroupInner", "header_textbox": "RowHeaderInner", "corner_textbox": "CornerInner"}
+    ],
+    "column_group": {"group": "ColumnGroup", "header_textbox": "ColumnHeader"},
+    "value": {"value_textbox": "ValueCell", "default_aggregate": "Sum"}
+  },
+  "bindings_schema": {
+    "row_groups": "[outer field, inner field] (required, exactly 2, outer-to-inner)",
+    "column_group": "field name (required)",
+    "value": "field name (required)",
+    "aggregate": "Sum|Avg|Count|Min|Max|First (optional, default Sum)",
+    "value_format": "format string e.g. N0 (optional)",
+    "row_group_labels": "[outer label, inner label] for the corner cells (optional)"
+  }
+}

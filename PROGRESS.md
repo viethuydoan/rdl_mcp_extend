@@ -40,6 +40,16 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
       aggregated cells). ✓ SIGNED OFF. Matrix-template pipeline proven.
 - Next matrix archetypes (later): matrix_grouped (nested row groups), matrix_and_table.
 
+## Phase TMG — matrix_grouped (nested row groups)
+- [x] TMG.1 Distilled `matrix_grouped` from user-authored `minimal_matrix_grouped.rdl`
+      (sanitized; outer/inner row groups RowGroupOuter/RowGroupInner, #305496 corner+col band)
+- [x] TMG.2 Generalized `_rebind_matrix` for N row groups; `_rebind_group` now scopes the
+      SortExpression to the group's own TablixMember (fixes nested-group sort targeting).
+      bindings.row_groups=[outer,inner] + optional row_group_labels for corner cells.
+- [x] TMG.3 19 tests pass (incl. independent-sort + corner-label + wrong-count); validate OK.
+- [~] TMG.4 **PENDING USER:** open a matrix_grouped-generated .rdl in Report Builder →
+      nested rows render under the outer group.
+
 ## Phase T — Template mode (user priority: build before Phase 3)
 Start from full styled archetypes (cloned + rebound) rather than bare skeletons. First
 archetype: **styled flat table** (distilled from `Raw Enrollment Revenue.rdl`). Templates

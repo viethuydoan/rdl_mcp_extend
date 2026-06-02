@@ -154,39 +154,78 @@ def _set_value_text(textbox: ET.Element, ns: str, text: str) -> None:
         val.text = text
 
 
+def _find_member_by_group(hierarchy: ET.Element, ns: str, group_name: str) -> Optional[ET.Element]:
+    """Return the TablixMember whose direct Group child has the given Name."""
+    for member in hierarchy.iter(f'{ns}TablixMember'):
+        grp = member.find(f'{ns}Group')
+        if grp is not None and grp.get('Name') == group_name:
+            return member
+    return None
+
+
 def _rebind_group(hierarchy: ET.Element, ns: str, slot: Dict[str, Any], field: str) -> None:
-    """Point a dynamic group (and its sort + header) at a new field."""
-    grp = hierarchy.find(f".//{ns}Group[@Name='{slot['group']}']")
-    if grp is None:
+    """Point a dynamic group (its expression, own sort, and header) at a new field.
+
+    The sort expression is scoped to the group's own TablixMember so nested row groups
+    (each with its own SortExpression) are rebound independently.
+    """
+    expr = f'=Fields!{field}.Value'
+    member = _find_member_by_group(hierarchy, ns, slot['group'])
+    if member is None:
         raise ValueError(f"Group '{slot['group']}' not found in template")
-    ge = grp.find(f'{ns}GroupExpressions/{ns}GroupExpression')
+    ge = member.find(f'{ns}Group/{ns}GroupExpressions/{ns}GroupExpression')
     if ge is not None:
-        ge.text = f'=Fields!{field}.Value'
-    sort_val = hierarchy.find(f'.//{ns}SortExpression/{ns}Value')
+        ge.text = expr
+    sort_val = member.find(f'{ns}SortExpressions/{ns}SortExpression/{ns}Value')
     if sort_val is not None:
-        sort_val.text = f'=Fields!{field}.Value'
+        sort_val.text = expr
+    # Header textbox names are unique, so a hierarchy-wide lookup is unambiguous.
     header = hierarchy.find(f".//{ns}Textbox[@Name='{slot['header_textbox']}']")
     if header is not None:
-        _set_value_text(header, ns, f'=Fields!{field}.Value')
+        _set_value_text(header, ns, expr)
 
 
 def _rebind_matrix(root: ET.Element, ns: str, manifest: Dict[str, Any],
                    bindings: Optional[Dict[str, Any]]) -> None:
-    """Rebind a matrix template's row group, column group, and value cell."""
+    """Rebind a matrix template's row group(s), column group, and value cell.
+
+    Supports one row group (slot 'row_group' / binding 'row_group') or several nested row
+    groups (slot 'row_groups' list / binding 'row_groups' list, outer-to-inner).
+    """
     if not bindings:
-        raise ValueError("matrix template requires 'bindings' with row_group, column_group, value")
-    for key in ('row_group', 'column_group', 'value'):
-        if not bindings.get(key):
-            raise ValueError(f"bindings.{key} is required for a matrix template")
+        raise ValueError("matrix template requires 'bindings' (row group(s), column_group, value)")
 
     slots = manifest['slots']
     tablix = root.find(f".//{ns}Tablix[@Name='{manifest['tablix_name']}']")
     if tablix is None:
         raise ValueError(f"Template tablix '{manifest['tablix_name']}' not found")
-
     row_hier = tablix.find(f'{ns}TablixRowHierarchy')
     col_hier = tablix.find(f'{ns}TablixColumnHierarchy')
-    _rebind_group(row_hier, ns, slots['row_group'], bindings['row_group'])
+
+    # Row groups: accept singular or list from both the manifest and the bindings.
+    row_slots = slots.get('row_groups') or [slots['row_group']]
+    row_fields = bindings.get('row_groups')
+    if row_fields is None and bindings.get('row_group'):
+        row_fields = [bindings['row_group']]
+    if not row_fields:
+        raise ValueError("bindings.row_group (or row_groups) is required")
+    if len(row_fields) != len(row_slots):
+        raise ValueError(f"this template expects {len(row_slots)} row group field(s), "
+                         f"got {len(row_fields)}")
+    if not bindings.get('column_group'):
+        raise ValueError("bindings.column_group is required")
+    if not bindings.get('value'):
+        raise ValueError("bindings.value is required")
+
+    labels = bindings.get('row_group_labels') or []
+    for i, (slot, field) in enumerate(zip(row_slots, row_fields)):
+        _rebind_group(row_hier, ns, slot, field)
+        # Optional: relabel the static corner cell for this row dimension.
+        if i < len(labels) and slot.get('corner_textbox'):
+            corner = tablix.find(f".//{ns}Textbox[@Name='{slot['corner_textbox']}']")
+            if corner is not None:
+                _set_value_text(corner, ns, labels[i])
+
     _rebind_group(col_hier, ns, slots['column_group'], bindings['column_group'])
 
     aggregate = bindings.get('aggregate', slots['value'].get('default_aggregate', 'Sum'))
@@ -267,8 +306,9 @@ def create_report_from_template(filepath: str, template: str, title: str, source
     try:
         if structure == 'matrix':
             _rebind_matrix(root, ns, manifest, bindings)
-            detail = (f"matrix: rows={bindings['row_group']}, cols={bindings['column_group']}, "
-                      f"value={bindings['value']}")
+            rows = (bindings or {}).get('row_groups') or [(bindings or {}).get('row_group')]
+            detail = (f"matrix: rows={'/'.join(str(r) for r in rows)}, "
+                      f"cols={(bindings or {}).get('column_group')}, value={(bindings or {}).get('value')}")
         else:
             _rebind_tablix_columns(root, ns, manifest, fields)
             detail = f"{len(fields)} columns"
