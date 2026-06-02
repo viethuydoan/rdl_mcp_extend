@@ -412,6 +412,29 @@ def create_composite_report_from_template(filepath: str, template: str, title: s
                 if not columns:
                     raise ValueError(f"region '{region_name}' (table) requires 'columns'")
                 _rebind_table_region(root, ns, region['tablix_name'], region['prototype'], columns)
+            elif region['kind'] == 'list':
+                # Grouped container (List/Rectangle): rebind its group (expression + sort +
+                # PageName so each instance becomes its own Excel sheet) and the block title.
+                group_field = caller.get('group_field')
+                if not group_field:
+                    raise ValueError(f"region '{region_name}' (list) requires 'group_field'")
+                list_tablix = _find_tablix(root, ns, region['tablix_name'])
+                if list_tablix is None:
+                    raise ValueError(f"Template tablix '{region['tablix_name']}' not found")
+                row_hier = list_tablix.find(f'{ns}TablixRowHierarchy')
+                _rebind_group(row_hier, ns,
+                              {'group': region['group'], 'header_textbox': region.get('header_textbox')},
+                              group_field)
+                # In a List/Rectangle the page name (Excel sheet name) sits on the Rectangle,
+                # not the Group. Rebind every PageName in the container to the group field.
+                for pn in list_tablix.iter(f'{ns}PageName'):
+                    pn.text = f'=Fields!{group_field}.Value'
+                title_name = region.get('title_textbox')
+                if title_name:
+                    title_tb = root.find(f".//{ns}Textbox[@Name='{title_name}']")
+                    if title_tb is not None:
+                        _set_value_text(title_tb, ns,
+                                        caller.get('title') or f'=Fields!{group_field}.Value')
             else:
                 raise ValueError(f"unknown region kind '{region['kind']}'")
     except ValueError as e:

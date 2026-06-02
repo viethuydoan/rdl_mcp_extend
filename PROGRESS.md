@@ -57,8 +57,21 @@ RDL mechanism: page-break group = Group with <PageBreak><BreakLocation>Between</
       composite manifest. Matrix2: Category = pagination-only group (PageBreak Between + PageName,
       no header) + RowCat1 visible inner. `_rebind_group` now rebinds PageName + tolerates header-less
       groups. PageBreak/PageName baked in template; engine only swaps the field. 5 archetypes total.
-- [~] TMM.3 23 tests pass (incl. PageName/PageBreak rebind), validate OK. **PENDING USER:** open in
-      Report Builder + Export to Excel → one sheet per category.
+- [x] TMM.3 Verified in Report Builder + Excel export → one sheet per category. ✓ SIGNED OFF.
+
+## Phase TMR — grouped-rectangle of multiple matrices (N matrices per group instance)
+Pattern: a List (Tablix with one detail cell) grouped by Category, detail cell holds a Rectangle
+containing N matrices (+ optional title). Rectangle repeats per group. Nested data regions in a
+grouped scope SHARE the list's dataset (scoped/filtered to the current group automatically).
+- [x] TMR.1 User authored + trimmed matrix_rectangle_grouped.rdl (List by Category → Rectangle →
+      2 single-value matrices) + verified Excel export (1 sheet per category)
+- [x] TMR.2 Distilled `grouped_rectangle_matrices` (sanitized). New composite region kind `list`:
+      rebinds the container group (expr+sort), the Rectangle PageName (note: in a List the PageName
+      is on the Rectangle, not the Group), and the block title. Two independently-bindable
+      single-value matrix regions (block1/block2), one shared dataset. 6 archetypes.
+- [~] TMR.3 25 tests pass (container/title/blocks + PageName rebind + group_field guard), validate OK.
+      **PENDING USER:** open in Report Builder + Export to Excel → one sheet per category, each with
+      title + 2 matrices.
 
 ## Phase TMG — matrix_grouped (nested row groups)
 - [x] TMG.1 Distilled `matrix_grouped` from user-authored `minimal_matrix_grouped.rdl`

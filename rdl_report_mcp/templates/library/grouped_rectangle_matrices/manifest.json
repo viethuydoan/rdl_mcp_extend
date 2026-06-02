@@ -1,0 +1,40 @@
+{
+  "name": "grouped_rectangle_matrices",
+  "title": "Grouped Rectangle of Matrices (block per category)",
+  "description": "A List grouped by Category whose detail Rectangle holds a block title plus TWO independently-bindable single-value matrices (stacked). The block repeats per Category, page-breaks between instances, and is named per category (PageName) so Excel produces one worksheet per category. All regions share ONE dataset (the matrices are scoped to the current category). Use create_composite_report_from_template with regions {container, block1, block2}.",
+  "category": "composite",
+  "structure": "composite",
+  "page_unit": "Mm",
+  "datasets": ["MatrixData"],
+  "regions": {
+    "container": {
+      "kind": "list",
+      "tablix_name": "Tablix2",
+      "dataset": "MatrixData",
+      "group": "Category",
+      "title_textbox": "Textbox3",
+      "desc": "The grouped List/Rectangle. group_field drives the Category grouping, the page break, the Excel sheet name (PageName), and the block title."
+    },
+    "block1": {
+      "kind": "matrix",
+      "tablix_name": "Tablix3",
+      "dataset": "MatrixData",
+      "slots": {
+        "row_group": {"group": "RowCat1", "header_textbox": "RowCat1"},
+        "column_group": {"group": "ColCat1", "header_textbox": "ColCat1"},
+        "value": {"value_textbox": "Val1", "default_aggregate": "Sum"}
+      }
+    },
+    "block2": {
+      "kind": "matrix",
+      "tablix_name": "Tablix4",
+      "dataset": "MatrixData",
+      "slots": {
+        "row_group": {"group": "RowCat2", "header_textbox": "RowCat2"},
+        "column_group": {"group": "ColCat2", "header_textbox": "ColCat2"},
+        "value": {"value_textbox": "Val21", "default_aggregate": "Sum"}
+      }
+    }
+  },
+  "bindings_note": "regions={container:{group_field:<category field>, title?:<expr/label>}, block1:{bindings:{row_group,column_group,value,aggregate?,value_format?}}, block2:{bindings:{...}}}. One dataset (MatrixData) holds every field referenced."
+}

@@ -242,3 +242,52 @@ def test_paged_matrix_rebinds_pagename_and_keeps_breaks(tmp_path):
     # Tablix starts on a new page (sheet) after matrix 1
     assert t2.find(f'{NS}PageBreak/{NS}BreakLocation').text == 'Start'
     assert validation.validate_rdl(fp)['valid'] is True
+
+
+# --- grouped rectangle of matrices (List > Rectangle > 2 matrices, block per category) ---
+
+def test_grouped_rectangle_rebinds_container_title_and_blocks(tmp_path):
+    fp = str(tmp_path / 'grect.rdl')
+    res = templates_lib.create_composite_report_from_template(
+        filepath=fp, template='grouped_rectangle_matrices', title='G', source_type='fabric',
+        connection={'name': 'ds', 'data_source': 's', 'initial_catalog': 'd'},
+        datasets=[{'name': 'MatrixData', 'query': 'SELECT cat,c,ra,rb,rev,days FROM t',
+                   'fields': [{'name': 'cat'}, {'name': 'c'}, {'name': 'ra'}, {'name': 'rb'},
+                              {'name': 'rev', 'type_name': 'System.Decimal'},
+                              {'name': 'days', 'type_name': 'System.Decimal'}]}],
+        regions={
+            'container': {'group_field': 'cat'},
+            'block1': {'bindings': {'row_group': 'ra', 'column_group': 'c', 'value': 'rev'}},
+            'block2': {'bindings': {'row_group': 'rb', 'column_group': 'c', 'value': 'days'}},
+        })
+    assert res['success'], res['message']
+    root = ET.parse(fp).getroot()
+    txt = open(fp, encoding='utf-8').read()
+    assert 'ns0:' not in txt and '<Rectangle ' in txt
+    # container: Category group expression + PageName both -> cat
+    t2 = root.find(f".//{NS}Tablix[@Name='Tablix2']")
+    cat = next(m for m in t2.find(f'{NS}TablixRowHierarchy').iter(f'{NS}TablixMember')
+               if (m.find(f'{NS}Group') is not None and m.find(f'{NS}Group').get('Name') == 'Category'))
+    assert cat.find(f'{NS}Group/{NS}GroupExpressions/{NS}GroupExpression').text == '=Fields!cat.Value'
+    # PageName (Excel sheet name) lives on the Rectangle in a List; rebound to the group field
+    assert '=Fields!cat.Value' in [p.text for p in t2.iter(f'{NS}PageName')]
+    # title rebound to the category
+    assert root.find(f".//{NS}Textbox[@Name='Textbox3']").find(f'.//{NS}Value').text == '=Fields!cat.Value'
+    # both blocks independently bound, single value each
+    b1 = root.find(f".//{NS}Tablix[@Name='Tablix3']")
+    b2 = root.find(f".//{NS}Tablix[@Name='Tablix4']")
+    assert b1.find(f'.//{NS}TablixBody//{NS}Value').text == '=Sum(Fields!rev.Value)'
+    assert b2.find(f'.//{NS}TablixBody//{NS}Value').text == '=Sum(Fields!days.Value)'
+    assert sorted(g.text for g in b1.findall(f'.//{NS}GroupExpression')) == ['=Fields!c.Value', '=Fields!ra.Value']
+    assert validation.validate_rdl(fp)['valid'] is True
+
+
+def test_grouped_rectangle_requires_group_field(tmp_path):
+    fp = str(tmp_path / 'grect2.rdl')
+    res = templates_lib.create_composite_report_from_template(
+        filepath=fp, template='grouped_rectangle_matrices', title='G', source_type='fabric',
+        connection={'name': 'ds', 'data_source': 's', 'initial_catalog': 'd'},
+        datasets=[{'name': 'MatrixData', 'query': 'SELECT 1', 'fields': [{'name': 'cat'}]}],
+        regions={'container': {}, 'block1': {'bindings': {'row_group': 'a', 'column_group': 'b', 'value': 'c'}},
+                 'block2': {'bindings': {'row_group': 'a', 'column_group': 'b', 'value': 'c'}}})
+    assert res['success'] is False and 'group_field' in res['message']
