@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# Secrets / env
+.env
+.env.*
+!.env.template
+
+# Never commit real customer reports or data into this repo.
+# Only sanitized template skeletons (placeholder connection strings) belong here.
+*.xlsx
+*.xlsm
+# Allow curated template/fixture RDLs explicitly; ignore any stray real ones at root.
+/*.rdl

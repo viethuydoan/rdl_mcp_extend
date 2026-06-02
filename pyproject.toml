@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rdl-report-mcp"
+version = "0.1.0"
+description = "Author and edit SSRS/Fabric paginated reports (incl. matrices) via an MCP server — extends bethmaloney/rdl-mcp"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+
+[tool.setuptools]
+packages = ["rdl_report_mcp"]
+py-modules = ["rdl_report_mcp_server"]
+
+[tool.setuptools.package-data]
+rdl_report_mcp = ["templates/*.rdl", "templates/*.xml", "templates/fragments/*.xml"]
+
+[project.scripts]
+rdl-report-mcp = "rdl_report_mcp_server:main"
+
+[project.urls]
+UpstreamBase = "https://github.com/bethmaloney/rdl-mcp"
