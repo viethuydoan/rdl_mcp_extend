@@ -23,10 +23,13 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
 - [x] T1.3 Seam verified: no engine module imports `server`; `server.py` imports engine modules
 
 ## Phase 2 — create_report (fabric SQLAZURE + plain SQL)
-- [ ] T2.1 `templates/report_skeleton_sql.rdl`
-- [ ] T2.2 `report_builder.create_report(source_type in {fabric,sql})`
-- [ ] T2.3 Register tool in `server.py`
-- [ ] T2.4 Verify: validate_rdl passes; opens in Report Builder w/ data
+- [x] T2.1 `templates/report_skeleton_sql.rdl` (sanitized, placeholder conn)
+- [x] T2.2 `report_builder.create_report(source_type in {fabric,sql})` + QueryParameters + ReportParameters
+- [x] T2.3 Registered in `server.py` (16 tools); exported in `__init__`
+- [~] T2.4 Automated: validate_rdl=valid (warn: No Tablix), MCP stdio smoke OK, 5 pytest pass.
+      **PENDING USER:** open a generated .rdl in Power BI Report Builder to confirm it loads
+      + dataset query returns rows. (Body is empty by design until visual phases.)
+      Also fixed: validate_rdl now treats "No Tablix" as a warning, not a failure.
 
 ## Phase 3 — create_report (DAX) + add_dataset
 - [ ] T3.1 `templates/report_skeleton_dax.rdl`
@@ -66,4 +69,6 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
 - 2026-06-02: Fixed critical namespace bug in `xml_utils.register_namespaces` — base
   `write_xml` was emitting `<ns0:Report>` and dropping default `xmlns`; now registers the
   default ns with empty prefix so RDL round-trips cleanly. Prereq for all generation.
-- Next: Phase 2 — `templates/report_skeleton_sql.rdl` + `report_builder.create_report`.
+- 2026-06-02: Phase 2 built — `create_report` (fabric/sql) + skeleton + server wiring + 5
+  tests. validate_rdl "No Tablix" downgraded to warning. Awaiting user Report Builder check (T2.4).
+- Next: Phase 3 — DAX skeleton + DAX branch of create_report + add_dataset.

@@ -10,6 +10,7 @@ from . import columns
 from . import datasets
 from . import parameters
 from . import validation
+from . import report_builder
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,10 @@ class MCPServer:
     def register_tools(self):
         """Register all available tools."""
         self.tools = {
+            'create_report': {
+                'function': self.create_report,
+                'description': 'Create a new paginated report from scratch with a SQL-style data source (Fabric SQL endpoint or SQL Server) and one embedded T-SQL dataset'
+            },
             'describe_rdl_report': {
                 'function': self.describe_rdl_report,
                 'description': 'Get a high-level summary of the RDL report structure'
@@ -176,6 +181,54 @@ class MCPServer:
     def _get_tool_schema(self, tool_name: str) -> Dict[str, Any]:
         """Get the JSON schema for a tool's parameters."""
         schemas = {
+            'create_report': {
+                'type': 'object',
+                'properties': {
+                    'filepath': {'type': 'string', 'description': 'Output path for the new .rdl file'},
+                    'title': {'type': 'string', 'description': 'Report title'},
+                    'source_type': {'type': 'string', 'enum': ['fabric', 'sql'], 'description': "'fabric' = Fabric SQL endpoint (SQLAZURE); 'sql' = SQL Server (integrated security)"},
+                    'connection': {
+                        'type': 'object',
+                        'description': "Connection info: either {connect_string} or {data_source, initial_catalog}; optional {name} for the DataSource element",
+                        'properties': {
+                            'data_source': {'type': 'string'},
+                            'initial_catalog': {'type': 'string'},
+                            'connect_string': {'type': 'string', 'description': 'Explicit ConnectString override'},
+                            'name': {'type': 'string', 'description': 'DataSource element name (default DataSource1)'}
+                        }
+                    },
+                    'dataset_name': {'type': 'string', 'description': 'Name of the dataset'},
+                    'query': {'type': 'string', 'description': 'Embedded T-SQL CommandText'},
+                    'fields': {
+                        'type': 'array',
+                        'description': 'Dataset fields',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'data_field': {'type': 'string', 'description': 'Source column (defaults to name)'},
+                                'type_name': {'type': 'string', 'description': '.NET type, e.g. System.String (default), System.Decimal'}
+                            },
+                            'required': ['name']
+                        }
+                    },
+                    'parameters': {
+                        'type': 'array',
+                        'description': 'Optional report parameters; each also becomes a @name QueryParameter',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'data_type': {'type': 'string', 'description': 'String|Integer|Boolean|DateTime|Float'},
+                                'prompt': {'type': 'string'},
+                                'default': {'description': 'Optional default value'}
+                            },
+                            'required': ['name']
+                        }
+                    }
+                },
+                'required': ['filepath', 'title', 'source_type', 'connection', 'dataset_name', 'query', 'fields']
+            },
             'describe_rdl_report': {
                 'type': 'object',
                 'properties': {
@@ -319,6 +372,12 @@ class MCPServer:
         return schemas.get(tool_name, {'type': 'object', 'properties': {}})
 
     # Delegate methods to modules
+
+    def create_report(self, filepath: str, title: str, source_type: str,
+                      connection: Dict[str, Any], dataset_name: str, query: str,
+                      fields: list, parameters: Optional[list] = None) -> Dict[str, Any]:
+        return report_builder.create_report(filepath, title, source_type, connection,
+                                            dataset_name, query, fields, parameters)
 
     def describe_rdl_report(self, filepath: str) -> Dict[str, Any]:
         return reader.describe_rdl_report(filepath)

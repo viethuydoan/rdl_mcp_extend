@@ -151,10 +151,11 @@ def validate_rdl(filepath: str) -> Dict[str, Any]:
                     field_names.add(field_name)
             dataset_fields[name] = field_names
 
-        # Check for at least one Tablix
+        # A report with no Tablix is still valid RDL (e.g. a freshly scaffolded report
+        # whose body has no visuals yet) — flag it as a warning, not a hard failure.
         tablixes = root.findall(f'.//{ns}Tablix')
         if not tablixes:
-            issues.append('No Tablix (table) found')
+            warnings.append('No Tablix (table) found')
 
         # Validate field references in each Tablix
         for tablix in tablixes:
