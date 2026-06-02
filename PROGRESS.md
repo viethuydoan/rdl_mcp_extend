@@ -47,8 +47,8 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
       SortExpression to the group's own TablixMember (fixes nested-group sort targeting).
       bindings.row_groups=[outer,inner] + optional row_group_labels for corner cells.
 - [x] TMG.3 19 tests pass (incl. independent-sort + corner-label + wrong-count); validate OK.
-- [~] TMG.4 **PENDING USER:** open a matrix_grouped-generated .rdl in Report Builder →
-      nested rows render under the outer group.
+- [x] TMG.4 Verified in Report Builder — nested rows render under the outer group. ✓ SIGNED OFF.
+      Per user, removed the DimGray LeftBorder accent from the template (value cell + col header).
 
 ## Phase T — Template mode (user priority: build before Phase 3)
 Start from full styled archetypes (cloned + rebound) rather than bare skeletons. First
