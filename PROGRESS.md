@@ -62,4 +62,8 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
 - [ ] Not scheduled. Gate: MCP engine stable + tested.
 
 ## Session log
-- 2026-06-02: Phase 0/1 started — vendored base, scaffolding.
+- 2026-06-02: Phase 0/1 done & pushed (scaffold, vendored base, seam verified).
+- 2026-06-02: Fixed critical namespace bug in `xml_utils.register_namespaces` — base
+  `write_xml` was emitting `<ns0:Report>` and dropping default `xmlns`; now registers the
+  default ns with empty prefix so RDL round-trips cleanly. Prereq for all generation.
+- Next: Phase 2 — `templates/report_skeleton_sql.rdl` + `report_builder.create_report`.

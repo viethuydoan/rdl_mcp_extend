@@ -18,7 +18,7 @@ def get_namespace(root: ET.Element) -> str:
 
 def register_namespaces(filepath: str):
     """Register all namespaces found in the file to preserve them when writing."""
-    with open(filepath, 'r') as f:
+    with open(filepath, 'r', encoding='utf-8') as f:
         content = f.read()
 
     # Find all namespace declarations
@@ -31,12 +31,15 @@ def register_namespaces(filepath: str):
         except ValueError:
             pass  # Namespace already registered
 
-    # Also register the default namespace if present
+    # Register the default namespace with the empty prefix so it round-trips as
+    # xmlns="..." instead of being rewritten as ns0:. ElementTree *can* register an
+    # empty prefix; without this the RDL root becomes <ns0:Report> and SSRS rejects it.
     default_ns = re.search(r'xmlns="([^"]+)"', content)
     if default_ns:
-        # Can't register default namespace with empty prefix in ElementTree
-        # but we track it for reference
-        pass
+        try:
+            ET.register_namespace('', default_ns.group(1))
+        except ValueError:
+            pass
 
 
 def parse_rdl(filepath: str) -> ET.Element:
