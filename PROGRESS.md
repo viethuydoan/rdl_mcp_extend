@@ -36,7 +36,8 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
       (sets row/col GroupExpression + SortExpression + header textboxes + value aggregate/format)
 - [x] TM.3 `create_report_from_template` gains `bindings` arg (row_group/column_group/value/
       aggregate/value_format); server schema+delegate updated. 16 tests pass; MCP matrix smoke OK.
-- [~] TM.4 **PENDING USER:** open a matrix-generated .rdl in Report Builder → renders a pivot.
+- [x] TM.4 Verified in Report Builder — renders a pivot (rows x columns, #305496 header,
+      aggregated cells). ✓ SIGNED OFF. Matrix-template pipeline proven.
 - Next matrix archetypes (later): matrix_grouped (nested row groups), matrix_and_table.
 
 ## Phase T — Template mode (user priority: build before Phase 3)
@@ -99,4 +100,7 @@ prototype cell). Sanitized: placeholder connection strings only.
 - 2026-06-02: Phase T (template mode) built — styled_flat_table archetype + manifest,
   templates_lib engine (clone prototype cells, stamp 1 styled column/field), list_templates +
   create_report_from_template tools (18 total), 12 tests pass. Awaiting user RB check (TT.6).
-- Next: TT.6 user verify, then Phase 3 (DAX) — which also gives template mode DAX for free.
+- 2026-06-02: TT.6 + matrix mode done. simple_matrix template + _rebind_matrix + bindings
+  arg. Both archetypes (styled_flat_table, simple_matrix) verified in Report Builder. 16 tests.
+- Next (user to choose): matrix_grouped / matrix_and_table archetypes, or Phase 3 (DAX,
+  which gives template mode DAX for free), or Strategy B dynamic group/value editing.
