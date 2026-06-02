@@ -89,18 +89,20 @@ def _stamp_cell(proto_cell: ET.Element, ns: str, textbox_name: str,
     return cell
 
 
-def _rebind_tablix_columns(root: ET.Element, ns: str, manifest: Dict[str, Any],
-                           fields: List[Dict[str, Any]]) -> None:
-    """Replace the template's prototype column with one styled column per field."""
-    proto = manifest['prototype']
-    tablix_name = manifest['tablix_name']
-    default_width = proto.get('default_column_width', '1.5in')
-
-    tablix = None
+def _find_tablix(root: ET.Element, ns: str, tablix_name: str) -> Optional[ET.Element]:
     for tb in root.findall(f'.//{ns}Tablix'):
         if tb.get('Name') == tablix_name:
-            tablix = tb
-            break
+            return tb
+    return None
+
+
+def _rebind_table_region(root: ET.Element, ns: str, tablix_name: str,
+                         prototype: Dict[str, Any], fields: List[Dict[str, Any]]) -> None:
+    """Replace a table tablix's prototype column with one styled column per field."""
+    proto = prototype
+    default_width = proto.get('default_column_width', '1.5in')
+
+    tablix = _find_tablix(root, ns, tablix_name)
     if tablix is None:
         raise ValueError(f"Template tablix '{tablix_name}' not found")
 
@@ -185,9 +187,18 @@ def _rebind_group(hierarchy: ET.Element, ns: str, slot: Dict[str, Any], field: s
         _set_value_text(header, ns, expr)
 
 
-def _rebind_matrix(root: ET.Element, ns: str, manifest: Dict[str, Any],
-                   bindings: Optional[Dict[str, Any]]) -> None:
-    """Rebind a matrix template's row group(s), column group, and value cell.
+def _set_region_dataset(root: ET.Element, ns: str, tablix_name: str, dataset_name: str) -> None:
+    """Point a tablix's DataSetName at the given dataset."""
+    tablix = _find_tablix(root, ns, tablix_name)
+    if tablix is not None:
+        dsn = tablix.find(f'{ns}DataSetName')
+        if dsn is not None:
+            dsn.text = dataset_name
+
+
+def _rebind_matrix_region(root: ET.Element, ns: str, tablix_name: str,
+                          slots: Dict[str, Any], bindings: Optional[Dict[str, Any]]) -> None:
+    """Rebind a matrix tablix's row group(s), column group, and value cell.
 
     Supports one row group (slot 'row_group' / binding 'row_group') or several nested row
     groups (slot 'row_groups' list / binding 'row_groups' list, outer-to-inner).
@@ -195,10 +206,9 @@ def _rebind_matrix(root: ET.Element, ns: str, manifest: Dict[str, Any],
     if not bindings:
         raise ValueError("matrix template requires 'bindings' (row group(s), column_group, value)")
 
-    slots = manifest['slots']
-    tablix = root.find(f".//{ns}Tablix[@Name='{manifest['tablix_name']}']")
+    tablix = _find_tablix(root, ns, tablix_name)
     if tablix is None:
-        raise ValueError(f"Template tablix '{manifest['tablix_name']}' not found")
+        raise ValueError(f"Template tablix '{tablix_name}' not found")
     row_hier = tablix.find(f'{ns}TablixRowHierarchy')
     col_hier = tablix.find(f'{ns}TablixColumnHierarchy')
 
@@ -295,22 +305,18 @@ def create_report_from_template(filepath: str, template: str, title: str, source
                                 fields, query_parameters)
 
     # Point the tablix at the new dataset
-    tablix = root.find(f".//{ns}Tablix[@Name='{manifest['tablix_name']}']")
-    if tablix is not None:
-        dsn = tablix.find(f'{ns}DataSetName')
-        if dsn is not None:
-            dsn.text = dataset_name
+    _set_region_dataset(root, ns, manifest['tablix_name'], dataset_name)
 
     # Rebind the data region according to the template's structure
     structure = manifest.get('structure', 'table')
     try:
         if structure == 'matrix':
-            _rebind_matrix(root, ns, manifest, bindings)
+            _rebind_matrix_region(root, ns, manifest['tablix_name'], manifest['slots'], bindings)
             rows = (bindings or {}).get('row_groups') or [(bindings or {}).get('row_group')]
             detail = (f"matrix: rows={'/'.join(str(r) for r in rows)}, "
                       f"cols={(bindings or {}).get('column_group')}, value={(bindings or {}).get('value')}")
         else:
-            _rebind_tablix_columns(root, ns, manifest, fields)
+            _rebind_table_region(root, ns, manifest['tablix_name'], manifest['prototype'], fields)
             detail = f"{len(fields)} columns"
     except ValueError as e:
         return {'success': False, 'message': str(e)}
@@ -325,5 +331,95 @@ def create_report_from_template(filepath: str, template: str, title: str, source
         'message': (f"Created report '{title}' from template '{template}' ({source_type}) at "
                     f"{filepath}: dataset '{dataset_name}', {detail}, "
                     f"{len(parameters)} parameters"),
+        'filepath': filepath,
+    }
+
+
+def create_composite_report_from_template(filepath: str, template: str, title: str,
+                                          source_type: str, connection: Dict[str, Any],
+                                          datasets: List[Dict[str, Any]],
+                                          regions: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a report from a multi-region template (e.g. matrix_and_table).
+
+    Args:
+        datasets: list of {name, query, fields, parameters?} — one per dataset the template
+                  expects (names must match the manifest's region datasets).
+        regions: dict keyed by the manifest region name. For a matrix region:
+                 {"bindings": {row_group(s), column_group, value, aggregate?, value_format?}}.
+                 For a table region: {"columns": [{name, label?, width?, format?}, ...]}.
+    """
+    manifest = _load_manifest(template)
+    if manifest is None:
+        avail = [t['name'] for t in list_templates()['templates']]
+        return {'success': False, 'message': f"Unknown template '{template}'. Available: {avail}"}
+    if manifest.get('structure') != 'composite':
+        return {'success': False,
+                'message': f"Template '{template}' is not composite; use create_report_from_template."}
+    if source_type not in report_builder._SOURCE_CONFIG:
+        return {'success': False, 'message': f"Unknown source_type '{source_type}'. Use 'fabric' or 'sql'."}
+
+    provided = {d['name']: d for d in datasets}
+    manifest_regions = manifest['regions']
+    needed_datasets = {r['dataset'] for r in manifest_regions.values()}
+    missing = needed_datasets - set(provided)
+    if missing:
+        return {'success': False,
+                'message': f"Missing dataset(s) {sorted(missing)}; this template needs {sorted(needed_datasets)}."}
+
+    tree = parse_rdl_tree(os.path.join(_template_dir(template), 'template.rdl'))
+    root = tree.getroot()
+    ns = get_namespace(root)
+
+    report_id = root.find(f'{report_builder.RD_NS}ReportID')
+    if report_id is not None:
+        report_id.text = str(uuid.uuid4())
+
+    # One shared data source
+    datasource_name = connection.get('name', 'DataSource1')
+    connect_string = report_builder._build_connect_string(source_type, connection)
+    datasources = root.find(f'{ns}DataSources')
+    for ds in list(datasources):
+        datasources.remove(ds)
+    report_builder._add_datasource(datasources, ns, datasource_name, source_type, connect_string)
+
+    # Rebuild all datasets
+    datasets_elem = root.find(f'{ns}DataSets')
+    for ds in list(datasets_elem):
+        datasets_elem.remove(ds)
+    all_params: List[Dict[str, Any]] = []
+    for d in datasets:
+        d_params = d.get('parameters', []) or []
+        report_builder._add_dataset(datasets_elem, ns, d['name'], datasource_name, d['query'],
+                                    d['fields'], [p['name'] for p in d_params])
+        all_params.extend(d_params)
+
+    # Rebind each region
+    try:
+        for region_name, region in manifest_regions.items():
+            caller = regions.get(region_name, {})
+            _set_region_dataset(root, ns, region['tablix_name'], region['dataset'])
+            if region['kind'] == 'matrix':
+                _rebind_matrix_region(root, ns, region['tablix_name'], region['slots'],
+                                      caller.get('bindings'))
+            elif region['kind'] == 'table':
+                columns = caller.get('columns')
+                if not columns:
+                    raise ValueError(f"region '{region_name}' (table) requires 'columns'")
+                _rebind_table_region(root, ns, region['tablix_name'], region['prototype'], columns)
+            else:
+                raise ValueError(f"unknown region kind '{region['kind']}'")
+    except ValueError as e:
+        return {'success': False, 'message': str(e)}
+
+    if all_params:
+        report_builder._add_report_parameters(root, ns, all_params)
+
+    write_xml(tree, filepath)
+    logger.info(f"Created composite report '{title}' from template '{template}' at {filepath}")
+    return {
+        'success': True,
+        'message': (f"Created composite report '{title}' from template '{template}' "
+                    f"({source_type}) at {filepath}: {len(datasets)} datasets, "
+                    f"{len(manifest_regions)} regions"),
         'filepath': filepath,
     }

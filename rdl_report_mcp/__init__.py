@@ -7,7 +7,8 @@ from .columns import add_column, remove_column, update_column_format, update_col
 from .datasets import add_dataset_field, remove_dataset_field, update_stored_procedure
 from .parameters import add_parameter, update_parameter
 from .report_builder import create_report
-from .templates_lib import list_templates, create_report_from_template
+from .templates_lib import (list_templates, create_report_from_template,
+                            create_composite_report_from_template)
 
 __version__ = '1.0.0'
 
@@ -34,4 +35,5 @@ __all__ = [
     'create_report',
     'list_templates',
     'create_report_from_template',
+    'create_composite_report_from_template',
 ]

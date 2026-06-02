@@ -38,7 +38,11 @@ class MCPServer:
             },
             'create_report_from_template': {
                 'function': self.create_report_from_template,
-                'description': 'Create a new report by cloning a styled template (e.g. styled_flat_table) and rebinding its data source, dataset, and columns to the supplied fields'
+                'description': 'Create a new report by cloning a styled single-region template (table or matrix, e.g. styled_flat_table, simple_matrix, matrix_grouped) and rebinding its data source, dataset, and columns/groups'
+            },
+            'create_composite_report_from_template': {
+                'function': self.create_composite_report_from_template,
+                'description': 'Create a new report from a multi-region composite template (e.g. matrix_and_table) with multiple datasets and regions; supply datasets[] and per-region bindings'
             },
             'describe_rdl_report': {
                 'function': self.describe_rdl_report,
@@ -305,6 +309,44 @@ class MCPServer:
                 },
                 'required': ['filepath', 'template', 'title', 'source_type', 'connection', 'dataset_name', 'query', 'fields']
             },
+            'create_composite_report_from_template': {
+                'type': 'object',
+                'properties': {
+                    'filepath': {'type': 'string', 'description': 'Output path for the new .rdl file'},
+                    'template': {'type': 'string', 'description': 'Composite template name (e.g. matrix_and_table)'},
+                    'title': {'type': 'string'},
+                    'source_type': {'type': 'string', 'enum': ['fabric', 'sql']},
+                    'connection': {
+                        'type': 'object',
+                        'description': 'Shared data source: {data_source, initial_catalog} or {connect_string}; optional {name}',
+                        'properties': {
+                            'data_source': {'type': 'string'},
+                            'initial_catalog': {'type': 'string'},
+                            'connect_string': {'type': 'string'},
+                            'name': {'type': 'string'}
+                        }
+                    },
+                    'datasets': {
+                        'type': 'array',
+                        'description': "One per dataset the template expects; names must match the template's region datasets",
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'query': {'type': 'string', 'description': 'Embedded T-SQL'},
+                                'fields': {'type': 'array', 'items': {'type': 'object'}},
+                                'parameters': {'type': 'array', 'items': {'type': 'object'}}
+                            },
+                            'required': ['name', 'query', 'fields']
+                        }
+                    },
+                    'regions': {
+                        'type': 'object',
+                        'description': "Keyed by region name. Matrix region: {bindings:{row_group(s),column_group,value,aggregate?,value_format?}}. Table region: {columns:[{name,label?,width?,format?}]}"
+                    }
+                },
+                'required': ['filepath', 'template', 'title', 'source_type', 'connection', 'datasets', 'regions']
+            },
             'describe_rdl_report': {
                 'type': 'object',
                 'properties': {
@@ -466,6 +508,13 @@ class MCPServer:
         return templates_lib.create_report_from_template(filepath, template, title, source_type,
                                                          connection, dataset_name, query, fields,
                                                          parameters, bindings)
+
+    def create_composite_report_from_template(self, filepath: str, template: str, title: str,
+                                              source_type: str, connection: Dict[str, Any],
+                                              datasets: list, regions: Dict[str, Any]) -> Dict[str, Any]:
+        return templates_lib.create_composite_report_from_template(filepath, template, title,
+                                                                  source_type, connection,
+                                                                  datasets, regions)
 
     def describe_rdl_report(self, filepath: str) -> Dict[str, Any]:
         return reader.describe_rdl_report(filepath)

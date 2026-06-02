@@ -40,6 +40,16 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
       aggregated cells). ✓ SIGNED OFF. Matrix-template pipeline proven.
 - Next matrix archetypes (later): matrix_grouped (nested row groups), matrix_and_table.
 
+## Phase TMT — matrix_and_table (composite: 2 datasets, 2 regions)
+- [x] TMT.1 Distilled `matrix_and_table` from user-authored `minimal_matrix_and_table.rdl`
+      (sanitized; MatrixTablix on top + TableTablix below, MatrixData/TableData, #305496 bands)
+- [x] TMT.2 Refactored engine to region-based (`_rebind_matrix_region`, `_rebind_table_region`,
+      `_find_tablix`, `_set_region_dataset`); single-region path unchanged.
+- [x] TMT.3 New `create_composite_report_from_template(datasets[], regions{})` tool (19 total);
+      manifest structure=composite with regions{matrix,table}. 22 tests pass; MCP smoke OK.
+- [~] TMT.4 **PENDING USER:** open a composite-generated .rdl in Report Builder → matrix on
+      top + detail table below, both bound.
+
 ## Phase TMG — matrix_grouped (nested row groups)
 - [x] TMG.1 Distilled `matrix_grouped` from user-authored `minimal_matrix_grouped.rdl`
       (sanitized; outer/inner row groups RowGroupOuter/RowGroupInner, #305496 corner+col band)

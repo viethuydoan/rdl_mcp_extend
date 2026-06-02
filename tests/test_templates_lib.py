@@ -157,3 +157,52 @@ def test_grouped_corner_labels_and_value(tmp_path):
 def test_grouped_wrong_row_group_count_fails(tmp_path):
     _, res = _make_grouped(tmp_path, bindings={'row_groups': ['r1'], 'column_group': 'c', 'value': 'v'})
     assert res['success'] is False and 'row group' in res['message'].lower()
+
+
+# --- composite (matrix + table) template ---
+
+def _make_composite(tmp_path, **over):
+    fp = str(tmp_path / 'composite.rdl')
+    args = dict(
+        filepath=fp, template='matrix_and_table', title='C', source_type='fabric',
+        connection={'name': 'ds', 'data_source': 'srv', 'initial_catalog': 'db'},
+        datasets=[
+            {'name': 'MatrixData', 'query': 'SELECT r,c,v FROM t',
+             'fields': [{'name': 'r'}, {'name': 'c'}, {'name': 'v', 'type_name': 'System.Decimal'}]},
+            {'name': 'TableData', 'query': 'SELECT a,b FROM t',
+             'fields': [{'name': 'a'}, {'name': 'b', 'type_name': 'System.Decimal'}]},
+        ],
+        regions={
+            'matrix': {'bindings': {'row_group': 'r', 'column_group': 'c', 'value': 'v'}},
+            'table': {'columns': [{'name': 'a', 'label': 'A'}, {'name': 'b', 'label': 'B', 'format': 'N0'}]},
+        },
+    )
+    args.update(over)
+    return fp, templates_lib.create_composite_report_from_template(**args)
+
+
+def test_composite_two_datasets_two_regions(tmp_path):
+    fp, res = _make_composite(tmp_path)
+    assert res['success'], res['message']
+    root = ET.parse(fp).getroot()
+    assert [d.get('Name') for d in root.findall(f'.//{NS}DataSet')] == ['MatrixData', 'TableData']
+    mt = root.find(f".//{NS}Tablix[@Name='MatrixTablix']")
+    tt = root.find(f".//{NS}Tablix[@Name='TableTablix']")
+    assert mt.find(f'{NS}DataSetName').text == 'MatrixData'
+    assert tt.find(f'{NS}DataSetName').text == 'TableData'
+    assert sorted(g.text for g in mt.findall(f'.//{NS}GroupExpression')) == ['=Fields!c.Value', '=Fields!r.Value']
+    assert len(tt.findall(f'.//{NS}TablixColumns/{NS}TablixColumn')) == 2
+    txt = open(fp, encoding='utf-8').read()
+    assert 'ns0:' not in txt and '=Fields!a.Value' in txt
+    assert validation.validate_rdl(fp)['valid'] is True
+
+
+def test_composite_missing_dataset_fails(tmp_path):
+    _, res = _make_composite(tmp_path, datasets=[
+        {'name': 'MatrixData', 'query': 'SELECT r,c,v', 'fields': [{'name': 'r'}, {'name': 'c'}, {'name': 'v'}]}])
+    assert res['success'] is False and 'tabledata' in res['message'].lower()
+
+
+def test_composite_rejects_single_region_template(tmp_path):
+    _, res = _make_composite(tmp_path, template='simple_matrix')
+    assert res['success'] is False and 'composite' in res['message'].lower()

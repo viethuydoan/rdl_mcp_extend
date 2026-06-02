@@ -1,0 +1,34 @@
+{
+  "name": "matrix_and_table",
+  "title": "Matrix + Detail Table",
+  "description": "A composite report with two data regions: a pivot matrix on top (bound to a summary dataset) and a styled detail table below it (bound to a detail dataset). Use create_composite_report_from_template: supply two datasets (MatrixData, TableData) and per-region bindings (matrix: row_group/column_group/value; table: columns). #305496 / white SemiBold header bands.",
+  "category": "composite",
+  "structure": "composite",
+  "page_unit": "Mm",
+  "datasets": ["MatrixData", "TableData"],
+  "regions": {
+    "matrix": {
+      "kind": "matrix",
+      "tablix_name": "MatrixTablix",
+      "dataset": "MatrixData",
+      "slots": {
+        "row_group": {"group": "RowGroup", "header_textbox": "RowHeader"},
+        "column_group": {"group": "ColumnGroup", "header_textbox": "ColumnHeader"},
+        "value": {"value_textbox": "ValueCell", "default_aggregate": "Sum"}
+      }
+    },
+    "table": {
+      "kind": "table",
+      "tablix_name": "TableTablix",
+      "dataset": "TableData",
+      "prototype": {
+        "header_textbox": "HeaderProto",
+        "data_textbox": "DataProto",
+        "header_row_index": 0,
+        "data_row_index": 1,
+        "default_column_width": "40mm"
+      }
+    }
+  },
+  "call": "create_composite_report_from_template(datasets=[{name:MatrixData,query,fields}, {name:TableData,query,fields}], regions={matrix:{bindings:{row_group,column_group,value,aggregate?,value_format?}}, table:{columns:[{name,label?,width?,format?}]}})"
+}
