@@ -29,6 +29,16 @@ deep matrix fragments = `Hill Valley report.rdl` (root). Excel ground-truth: mat
 - [x] T2.4 Opens cleanly in Report Builder (after empty-ReportItems fix); conn string +
       dataset SQL present. validate_rdl=valid, MCP stdio smoke OK, 7 pytest pass. ✓ SIGNED OFF
 
+## Phase TM — Matrix templates (Strategy A: pre-structured, rebind fields)
+- [x] TM.1 `simple_matrix` distilled from user-authored `minimal_matrix.rdl` (sanitized:
+      placeholder conn, zeroed IDs; #305496 col-header band) + manifest (structure=matrix, slots)
+- [x] TM.2 `templates_lib` dispatches on manifest `structure`; added `_rebind_matrix`
+      (sets row/col GroupExpression + SortExpression + header textboxes + value aggregate/format)
+- [x] TM.3 `create_report_from_template` gains `bindings` arg (row_group/column_group/value/
+      aggregate/value_format); server schema+delegate updated. 16 tests pass; MCP matrix smoke OK.
+- [~] TM.4 **PENDING USER:** open a matrix-generated .rdl in Report Builder → renders a pivot.
+- Next matrix archetypes (later): matrix_grouped (nested row groups), matrix_and_table.
+
 ## Phase T — Template mode (user priority: build before Phase 3)
 Start from full styled archetypes (cloned + rebound) rather than bare skeletons. First
 archetype: **styled flat table** (distilled from `Raw Enrollment Revenue.rdl`). Templates
@@ -40,9 +50,8 @@ prototype cell). Sanitized: placeholder connection strings only.
 - [x] TT.3 `templates_lib.py` engine: load template, clone prototype cells, stamp N columns
 - [x] TT.4 `create_report_from_template(...)` (reuses Phase 2 _add_datasource/_add_dataset)
 - [x] TT.5 `list_templates()` + both tools registered (18 total); exported
-- [~] TT.6 Automated: 12 pytest pass, validate=valid, MCP stdio smoke OK (styling/bindings/
-      unique names verified). **PENDING USER:** open a template-generated .rdl in Report
-      Builder — should render the styled table (this one has a tablix, unlike Phase 2).
+- [x] TT.6 Verified in Report Builder — styled table renders (blue header, bordered cells),
+      loads clean, previews rows. ✓ SIGNED OFF. Template-mode approach validated.
 
 ## Phase 3 — create_report (DAX) + add_dataset
 - [ ] T3.1 `templates/report_skeleton_dax.rdl`

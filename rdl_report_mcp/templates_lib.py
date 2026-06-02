@@ -147,14 +147,77 @@ def _rebind_tablix_columns(root: ET.Element, ns: str, manifest: Dict[str, Any],
     _update_tablix_width(tablix, ns)
 
 
+def _set_value_text(textbox: ET.Element, ns: str, text: str) -> None:
+    """Set the TextRun Value of a textbox."""
+    val = textbox.find(f'.//{ns}Value')
+    if val is not None:
+        val.text = text
+
+
+def _rebind_group(hierarchy: ET.Element, ns: str, slot: Dict[str, Any], field: str) -> None:
+    """Point a dynamic group (and its sort + header) at a new field."""
+    grp = hierarchy.find(f".//{ns}Group[@Name='{slot['group']}']")
+    if grp is None:
+        raise ValueError(f"Group '{slot['group']}' not found in template")
+    ge = grp.find(f'{ns}GroupExpressions/{ns}GroupExpression')
+    if ge is not None:
+        ge.text = f'=Fields!{field}.Value'
+    sort_val = hierarchy.find(f'.//{ns}SortExpression/{ns}Value')
+    if sort_val is not None:
+        sort_val.text = f'=Fields!{field}.Value'
+    header = hierarchy.find(f".//{ns}Textbox[@Name='{slot['header_textbox']}']")
+    if header is not None:
+        _set_value_text(header, ns, f'=Fields!{field}.Value')
+
+
+def _rebind_matrix(root: ET.Element, ns: str, manifest: Dict[str, Any],
+                   bindings: Optional[Dict[str, Any]]) -> None:
+    """Rebind a matrix template's row group, column group, and value cell."""
+    if not bindings:
+        raise ValueError("matrix template requires 'bindings' with row_group, column_group, value")
+    for key in ('row_group', 'column_group', 'value'):
+        if not bindings.get(key):
+            raise ValueError(f"bindings.{key} is required for a matrix template")
+
+    slots = manifest['slots']
+    tablix = root.find(f".//{ns}Tablix[@Name='{manifest['tablix_name']}']")
+    if tablix is None:
+        raise ValueError(f"Template tablix '{manifest['tablix_name']}' not found")
+
+    row_hier = tablix.find(f'{ns}TablixRowHierarchy')
+    col_hier = tablix.find(f'{ns}TablixColumnHierarchy')
+    _rebind_group(row_hier, ns, slots['row_group'], bindings['row_group'])
+    _rebind_group(col_hier, ns, slots['column_group'], bindings['column_group'])
+
+    aggregate = bindings.get('aggregate', slots['value'].get('default_aggregate', 'Sum'))
+    value_tb = tablix.find(f".//{ns}Textbox[@Name='{slots['value']['value_textbox']}']")
+    if value_tb is None:
+        raise ValueError("Value textbox not found in template")
+    _set_value_text(value_tb, ns, f"={aggregate}(Fields!{bindings['value']}.Value)")
+    if bindings.get('value_format'):
+        text_run = value_tb.find(f'.//{ns}TextRun')
+        style = text_run.find(f'{ns}Style')
+        if style is None:
+            style = ET.SubElement(text_run, f'{ns}Style')
+        fmt = style.find(f'{ns}Format')
+        if fmt is None:
+            fmt = ET.SubElement(style, f'{ns}Format')
+        fmt.text = bindings['value_format']
+
+
 def create_report_from_template(filepath: str, template: str, title: str, source_type: str,
                                 connection: Dict[str, Any], dataset_name: str, query: str,
                                 fields: List[Dict[str, Any]],
-                                parameters: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-    """Create a report by cloning a styled template and rebinding its data + columns.
+                                parameters: Optional[List[Dict[str, Any]]] = None,
+                                bindings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create a report by cloning a styled template and rebinding its data.
 
-    Args mirror create_report, plus `template` (a name from list_templates). Each field may
-    include {name, label?, data_field?, type_name?, width?, format?}.
+    Args mirror create_report, plus:
+      template: a name from list_templates
+      bindings: required for matrix templates — {row_group, column_group, value,
+                aggregate?, value_format?} referencing field names. Ignored for table
+                templates (which stamp one column per field).
+    Each field may include {name, data_field?, type_name?, label?, width?, format?}.
     """
     manifest = _load_manifest(template)
     if manifest is None:
@@ -192,13 +255,25 @@ def create_report_from_template(filepath: str, template: str, title: str, source
     report_builder._add_dataset(datasets, ns, dataset_name, datasource_name, query,
                                 fields, query_parameters)
 
-    # Point the tablix at the new dataset, then stamp columns from prototype
+    # Point the tablix at the new dataset
     tablix = root.find(f".//{ns}Tablix[@Name='{manifest['tablix_name']}']")
     if tablix is not None:
         dsn = tablix.find(f'{ns}DataSetName')
         if dsn is not None:
             dsn.text = dataset_name
-    _rebind_tablix_columns(root, ns, manifest, fields)
+
+    # Rebind the data region according to the template's structure
+    structure = manifest.get('structure', 'table')
+    try:
+        if structure == 'matrix':
+            _rebind_matrix(root, ns, manifest, bindings)
+            detail = (f"matrix: rows={bindings['row_group']}, cols={bindings['column_group']}, "
+                      f"value={bindings['value']}")
+        else:
+            _rebind_tablix_columns(root, ns, manifest, fields)
+            detail = f"{len(fields)} columns"
+    except ValueError as e:
+        return {'success': False, 'message': str(e)}
 
     if parameters:
         report_builder._add_report_parameters(root, ns, parameters)
@@ -208,7 +283,7 @@ def create_report_from_template(filepath: str, template: str, title: str, source
     return {
         'success': True,
         'message': (f"Created report '{title}' from template '{template}' ({source_type}) at "
-                    f"{filepath}: dataset '{dataset_name}', {len(fields)} columns, "
+                    f"{filepath}: dataset '{dataset_name}', {detail}, "
                     f"{len(parameters)} parameters"),
         'filepath': filepath,
     }

@@ -290,6 +290,17 @@ class MCPServer:
                             },
                             'required': ['name']
                         }
+                    },
+                    'bindings': {
+                        'type': 'object',
+                        'description': 'Required for matrix templates: maps field names to roles. {row_group, column_group, value, aggregate?, value_format?}. Ignored for table templates.',
+                        'properties': {
+                            'row_group': {'type': 'string', 'description': 'Field whose values become rows'},
+                            'column_group': {'type': 'string', 'description': 'Field whose values become columns'},
+                            'value': {'type': 'string', 'description': 'Numeric field aggregated in the cells'},
+                            'aggregate': {'type': 'string', 'description': 'Sum|Avg|Count|Min|Max|First (default Sum)'},
+                            'value_format': {'type': 'string', 'description': 'Format string e.g. N0'}
+                        }
                     }
                 },
                 'required': ['filepath', 'template', 'title', 'source_type', 'connection', 'dataset_name', 'query', 'fields']
@@ -450,10 +461,11 @@ class MCPServer:
     def create_report_from_template(self, filepath: str, template: str, title: str,
                                     source_type: str, connection: Dict[str, Any],
                                     dataset_name: str, query: str, fields: list,
-                                    parameters: Optional[list] = None) -> Dict[str, Any]:
+                                    parameters: Optional[list] = None,
+                                    bindings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return templates_lib.create_report_from_template(filepath, template, title, source_type,
                                                          connection, dataset_name, query, fields,
-                                                         parameters)
+                                                         parameters, bindings)
 
     def describe_rdl_report(self, filepath: str) -> Dict[str, Any]:
         return reader.describe_rdl_report(filepath)

@@ -57,3 +57,54 @@ def test_unique_textbox_names(tmp_path):
     import re
     names = re.findall(r'<Textbox Name="([^"]+)"', txt)
     assert len(names) == len(set(names)), f'duplicate textbox names: {names}'
+
+
+# --- matrix template ---
+
+def _make_matrix(tmp_path, **over):
+    fp = str(tmp_path / 'matrix.rdl')
+    args = dict(
+        filepath=fp, template='simple_matrix', title='M', source_type='fabric',
+        connection={'name': 'ds', 'data_source': 'srv', 'initial_catalog': 'db'},
+        dataset_name='data', query='SELECT r, c, v FROM t',
+        fields=[{'name': 'r'}, {'name': 'c', 'type_name': 'System.DateTime'},
+                {'name': 'v', 'type_name': 'System.Decimal'}],
+        bindings={'row_group': 'r', 'column_group': 'c', 'value': 'v',
+                  'aggregate': 'Sum', 'value_format': 'N0'},
+    )
+    args.update(over)
+    return fp, templates_lib.create_report_from_template(**args)
+
+
+def test_simple_matrix_in_library():
+    names = [t['name'] for t in templates_lib.list_templates()['templates']]
+    assert 'simple_matrix' in names
+
+
+def test_matrix_rebinds_groups_and_value(tmp_path):
+    fp, res = _make_matrix(tmp_path)
+    assert res['success'], res['message']
+    txt = open(fp, encoding='utf-8').read()
+    assert 'ns0:' not in txt and '<TablixCorner>' in txt
+    root = ET.parse(fp).getroot()
+    ges = sorted(g.text for g in root.findall(f'.//{NS}GroupExpression'))
+    assert ges == ['=Fields!c.Value', '=Fields!r.Value']
+    value = root.find(f".//{NS}TablixBody//{NS}Value").text
+    assert value == '=Sum(Fields!v.Value)'
+    assert '<Format>N0</Format>' in txt
+    assert validation.validate_rdl(fp)['valid'] is True
+
+
+def test_matrix_custom_aggregate(tmp_path):
+    fp, _ = _make_matrix(tmp_path, bindings={'row_group': 'r', 'column_group': 'c',
+                                             'value': 'v', 'aggregate': 'Avg'})
+    assert '=Avg(Fields!v.Value)' in open(fp, encoding='utf-8').read()
+
+
+def test_matrix_missing_bindings_fails(tmp_path):
+    fp = str(tmp_path / 'm.rdl')
+    res = templates_lib.create_report_from_template(
+        filepath=fp, template='simple_matrix', title='M', source_type='fabric',
+        connection={'name': 'd', 'data_source': 's', 'initial_catalog': 'd'},
+        dataset_name='data', query='SELECT 1', fields=[{'name': 'r'}], bindings=None)
+    assert res['success'] is False and 'bindings' in res['message'].lower()
