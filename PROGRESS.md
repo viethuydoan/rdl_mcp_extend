@@ -107,8 +107,9 @@ prototype cell). Sanitized: placeholder connection strings only.
 - [x] T3.3 `add_dataset(filepath, dataset_name, query, fields, datasource_name?)` — append a dataset
       bound to an existing data source (e.g. parameter-value lookups). 20 tools total.
 - [x] tests: 30 pass (DAX create_report/template, connect-string override, add_dataset + dup guard).
-- [~] T3.4 **PENDING USER:** open a DAX-sourced report in Report Builder against a real Power BI
-      semantic model (needs the real connect string / workspace + dataset names).
+- [x] T3.4 Verified — DAX report opens in Report Builder against a real Power BI semantic model. ✓
+      Note: templates are SOURCE-AGNOSTIC (datasource is cleared + rebuilt from source_type), so
+      all 6 archetypes work with source_type='dax' — NO separate DAX templates needed.
 
 ## Phase 4 — add_matrix (1×1×1)
 - [ ] T4.1 `templates/matrix_skeleton.xml` from Weekly Enrollment Trend
