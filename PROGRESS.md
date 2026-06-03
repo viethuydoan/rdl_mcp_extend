@@ -129,6 +129,12 @@ prototype cell). Sanitized: placeholder connection strings only.
 - [ ] T6.3 `add_matrix_column_group(...)`
 - [ ] T6.4 Register + verify nested groups vs xlsx ground-truth
 
+## Docs ✅
+- [x] README.md rewritten: overview, run, data sources (fabric/sql/dax) table, quick start,
+      template table (6 archetypes + which-tool/bindings), tools list (20), engine explanation,
+      add-an-archetype workflow, attribution.
+- [x] docs/TEMPLATES.md: full copy-paste example per archetype + add_dataset + DAX note.
+
 ## Phase 7 — Inverse ops, validation, tests, docs
 - [ ] T7.1 `remove_matrix_group` / `remove_matrix_value`
 - [ ] T7.2 matrix-aware `validate_rdl`
