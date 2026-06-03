@@ -300,7 +300,7 @@ def create_report_from_template(filepath: str, template: str, title: str, source
     datasources = root.find(f'{ns}DataSources')
     for ds in list(datasources):
         datasources.remove(ds)
-    report_builder._add_datasource(datasources, ns, datasource_name, source_type, connect_string)
+    report_builder._add_datasource(datasources, ns, datasource_name, source_type, connect_string, connection)
 
     # Rebind dataset: clear and rebuild
     datasets = root.find(f'{ns}DataSets')
@@ -386,7 +386,7 @@ def create_composite_report_from_template(filepath: str, template: str, title: s
     datasources = root.find(f'{ns}DataSources')
     for ds in list(datasources):
         datasources.remove(ds)
-    report_builder._add_datasource(datasources, ns, datasource_name, source_type, connect_string)
+    report_builder._add_datasource(datasources, ns, datasource_name, source_type, connect_string, connection)
 
     # Rebuild all datasets
     datasets_elem = root.find(f'{ns}DataSets')

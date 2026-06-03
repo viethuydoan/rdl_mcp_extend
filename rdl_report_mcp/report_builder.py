@@ -38,6 +38,12 @@ _SOURCE_CONFIG = {
         'security_type': 'Integrated',
         'auth_suffix': '',
     },
+    'dax': {
+        # Power BI semantic model (Analysis Services) queried with DAX.
+        'provider': 'PBIDATASET',
+        'security_type': 'None',
+        'auth_suffix': '',
+    },
 }
 
 
@@ -45,16 +51,27 @@ def _build_connect_string(source_type: str, connection: Dict[str, Any]) -> str:
     """Build the ConnectString, honoring an explicit override if provided."""
     if connection.get('connect_string'):
         return connection['connect_string']
+    if source_type == 'dax':
+        # pbiazure connection to a Power BI semantic model. Identity Provider (with tenant
+        # GUID) is environment-specific; pass it via connection['identity_provider'] or supply
+        # a full connect_string. Initial Catalog is the model/dataset GUID.
+        data_source = connection.get('data_source', 'pbiazure://api.powerbi.com/')
+        initial_catalog = connection.get('initial_catalog', '')
+        idp = connection.get('identity_provider')
+        idp_part = f';Identity Provider="{idp}"' if idp else ''
+        return (f'Data Source={data_source}{idp_part};Initial Catalog={initial_catalog};'
+                f'Integrated Security=ClaimsToken')
     data_source = connection.get('data_source', '')
     initial_catalog = connection.get('initial_catalog', '')
     suffix = _SOURCE_CONFIG[source_type]['auth_suffix']
     return f'Data Source={data_source};Initial Catalog={initial_catalog}{suffix}'
 
 
-def _add_datasource(datasources: ET.Element, ns: str, name: str,
-                    source_type: str, connect_string: str) -> None:
+def _add_datasource(datasources: ET.Element, ns: str, name: str, source_type: str,
+                    connect_string: str, connection: Optional[Dict[str, Any]] = None) -> None:
     """Append a <DataSource> (child order mirrors a working PBIRB report)."""
     cfg = _SOURCE_CONFIG[source_type]
+    connection = connection or {}
     ds = ET.SubElement(datasources, f'{ns}DataSource')
     ds.set('Name', name)
 
@@ -69,6 +86,13 @@ def _add_datasource(datasources: ET.Element, ns: str, name: str,
 
     ds_id = ET.SubElement(ds, f'{RD_NS}DataSourceID')
     ds_id.text = str(uuid.uuid4())
+
+    # Power BI semantic-model datasources carry the workspace + dataset names.
+    if source_type == 'dax':
+        ws = ET.SubElement(ds, f'{RD_NS}PowerBIWorkspaceName')
+        ws.text = connection.get('workspace_name', '')
+        pds = ET.SubElement(ds, f'{RD_NS}PowerBIDatasetName')
+        pds.text = connection.get('dataset_name', '')
 
 
 def _add_field(fields_elem: ET.Element, ns: str, field: Dict[str, Any]) -> None:
@@ -173,9 +197,10 @@ def create_report(filepath: str, title: str, source_type: str,
     connect_string = _build_connect_string(source_type, connection)
 
     datasources = root.find(f'{ns}DataSources')
-    _add_datasource(datasources, ns, datasource_name, source_type, connect_string)
+    _add_datasource(datasources, ns, datasource_name, source_type, connect_string, connection)
 
-    query_parameters = [p['name'] for p in parameters]
+    # DAX datasets don't use @name QueryParameters (the SQL pattern); skip auto-wiring them.
+    query_parameters = [] if source_type == 'dax' else [p['name'] for p in parameters]
     datasets = root.find(f'{ns}DataSets')
     _add_dataset(datasets, ns, dataset_name, datasource_name, query, fields, query_parameters)
 
@@ -188,5 +213,51 @@ def create_report(filepath: str, title: str, source_type: str,
         'success': True,
         'message': (f"Created report '{title}' ({source_type}) at {filepath} with dataset "
                     f"'{dataset_name}' ({len(fields)} fields, {len(parameters)} parameters)"),
+        'filepath': filepath,
+    }
+
+
+def add_dataset(filepath: str, dataset_name: str, query: str,
+                fields: List[Dict[str, Any]], datasource_name: Optional[str] = None) -> Dict[str, Any]:
+    """Append an additional dataset to an existing report.
+
+    Binds the dataset to an existing data source (``datasource_name``, or the first one in
+    the report if omitted) — useful for adding parameter-value / lookup datasets that share
+    the report's connection. ``fields`` items are {name, data_field?, type_name?}.
+    """
+    if not fields:
+        return {'success': False, 'message': 'At least one field is required.'}
+
+    tree = parse_rdl_tree(filepath)
+    root = tree.getroot()
+    ns = get_namespace(root)
+
+    datasources = root.find(f'{ns}DataSources')
+    available = [d.get('Name') for d in datasources.findall(f'{ns}DataSource')] if datasources is not None else []
+    if not available:
+        return {'success': False, 'message': 'Report has no data source to bind the dataset to.'}
+    if datasource_name is None:
+        datasource_name = available[0]
+    elif datasource_name not in available:
+        return {'success': False,
+                'message': f"Data source '{datasource_name}' not found. Available: {available}"}
+
+    datasets = root.find(f'{ns}DataSets')
+    if datasets is None:
+        # Insert a DataSets element right after DataSources (schema order)
+        datasets = ET.Element(f'{ns}DataSets')
+        root.insert(list(root).index(datasources) + 1, datasets)
+    for existing in datasets.findall(f'{ns}DataSet'):
+        if existing.get('Name') == dataset_name:
+            return {'success': False, 'message': f"Dataset '{dataset_name}' already exists."}
+
+    _add_dataset(datasets, ns, dataset_name, datasource_name, query, fields, [])
+
+    write_xml(tree, filepath)
+    logger.info(f"Added dataset '{dataset_name}' to {filepath}")
+    return {
+        'success': True,
+        'message': (f"Added dataset '{dataset_name}' ({len(fields)} fields) bound to data "
+                    f"source '{datasource_name}'"),
         'filepath': filepath,
     }

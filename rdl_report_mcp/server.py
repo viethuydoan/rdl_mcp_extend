@@ -30,7 +30,11 @@ class MCPServer:
         self.tools = {
             'create_report': {
                 'function': self.create_report,
-                'description': 'Create a new paginated report from scratch with a SQL-style data source (Fabric SQL endpoint or SQL Server) and one embedded T-SQL dataset'
+                'description': 'Create a new paginated report from scratch with a data source (fabric=Fabric SQL, sql=SQL Server, dax=Power BI semantic model) and one embedded dataset (T-SQL, or DAX for dax)'
+            },
+            'add_dataset': {
+                'function': self.add_dataset,
+                'description': 'Append an additional dataset (bound to an existing data source) to an existing report — e.g. a parameter value/lookup dataset'
             },
             'list_templates': {
                 'function': self.list_templates,
@@ -199,15 +203,18 @@ class MCPServer:
                 'properties': {
                     'filepath': {'type': 'string', 'description': 'Output path for the new .rdl file'},
                     'title': {'type': 'string', 'description': 'Report title'},
-                    'source_type': {'type': 'string', 'enum': ['fabric', 'sql'], 'description': "'fabric' = Fabric SQL endpoint (SQLAZURE); 'sql' = SQL Server (integrated security)"},
+                    'source_type': {'type': 'string', 'enum': ['fabric', 'sql', 'dax'], 'description': "'fabric' = Fabric SQL endpoint (SQLAZURE); 'sql' = SQL Server (integrated security)"},
                     'connection': {
                         'type': 'object',
-                        'description': "Connection info: either {connect_string} or {data_source, initial_catalog}; optional {name} for the DataSource element",
+                        'description': "Connection info. SQL/fabric: {data_source, initial_catalog} or {connect_string}. DAX: {connect_string} (recommended) or {initial_catalog=model GUID, identity_provider}, plus {workspace_name, dataset_name}. Optional {name} for the DataSource element.",
                         'properties': {
                             'data_source': {'type': 'string'},
-                            'initial_catalog': {'type': 'string'},
+                            'initial_catalog': {'type': 'string', 'description': 'DB/catalog (SQL) or model GUID (dax)'},
                             'connect_string': {'type': 'string', 'description': 'Explicit ConnectString override'},
-                            'name': {'type': 'string', 'description': 'DataSource element name (default DataSource1)'}
+                            'name': {'type': 'string', 'description': 'DataSource element name (default DataSource1)'},
+                            'identity_provider': {'type': 'string', 'description': 'dax only: Identity Provider string (with tenant GUID)'},
+                            'workspace_name': {'type': 'string', 'description': 'dax only: Power BI workspace name'},
+                            'dataset_name': {'type': 'string', 'description': 'dax only: Power BI dataset/model name'}
                         }
                     },
                     'dataset_name': {'type': 'string', 'description': 'Name of the dataset'},
@@ -242,6 +249,28 @@ class MCPServer:
                 },
                 'required': ['filepath', 'title', 'source_type', 'connection', 'dataset_name', 'query', 'fields']
             },
+            'add_dataset': {
+                'type': 'object',
+                'properties': {
+                    'filepath': {'type': 'string', 'description': 'Path to the existing .rdl file'},
+                    'dataset_name': {'type': 'string'},
+                    'query': {'type': 'string', 'description': 'Embedded query (T-SQL or DAX, matching the data source)'},
+                    'fields': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'name': {'type': 'string'},
+                                'data_field': {'type': 'string'},
+                                'type_name': {'type': 'string'}
+                            },
+                            'required': ['name']
+                        }
+                    },
+                    'datasource_name': {'type': 'string', 'description': 'Existing data source to bind to (defaults to the first one)'}
+                },
+                'required': ['filepath', 'dataset_name', 'query', 'fields']
+            },
             'list_templates': {
                 'type': 'object',
                 'properties': {}
@@ -252,7 +281,7 @@ class MCPServer:
                     'filepath': {'type': 'string', 'description': 'Output path for the new .rdl file'},
                     'template': {'type': 'string', 'description': 'Template name from list_templates (e.g. styled_flat_table)'},
                     'title': {'type': 'string', 'description': 'Report title'},
-                    'source_type': {'type': 'string', 'enum': ['fabric', 'sql'], 'description': "'fabric' = Fabric SQL endpoint; 'sql' = SQL Server"},
+                    'source_type': {'type': 'string', 'enum': ['fabric', 'sql', 'dax'], 'description': "'fabric' = Fabric SQL endpoint; 'sql' = SQL Server"},
                     'connection': {
                         'type': 'object',
                         'description': "Either {connect_string} or {data_source, initial_catalog}; optional {name}",
@@ -315,7 +344,7 @@ class MCPServer:
                     'filepath': {'type': 'string', 'description': 'Output path for the new .rdl file'},
                     'template': {'type': 'string', 'description': 'Composite template name (e.g. matrix_and_table)'},
                     'title': {'type': 'string'},
-                    'source_type': {'type': 'string', 'enum': ['fabric', 'sql']},
+                    'source_type': {'type': 'string', 'enum': ['fabric', 'sql', 'dax']},
                     'connection': {
                         'type': 'object',
                         'description': 'Shared data source: {data_source, initial_catalog} or {connect_string}; optional {name}',
@@ -496,6 +525,10 @@ class MCPServer:
                       fields: list, parameters: Optional[list] = None) -> Dict[str, Any]:
         return report_builder.create_report(filepath, title, source_type, connection,
                                             dataset_name, query, fields, parameters)
+
+    def add_dataset(self, filepath: str, dataset_name: str, query: str,
+                    fields: list, datasource_name: Optional[str] = None) -> Dict[str, Any]:
+        return report_builder.add_dataset(filepath, dataset_name, query, fields, datasource_name)
 
     def list_templates(self) -> Dict[str, Any]:
         return templates_lib.list_templates()

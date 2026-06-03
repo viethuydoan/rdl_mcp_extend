@@ -97,11 +97,18 @@ prototype cell). Sanitized: placeholder connection strings only.
 - [x] TT.6 Verified in Report Builder — styled table renders (blue header, bordered cells),
       loads clean, previews rows. ✓ SIGNED OFF. Template-mode approach validated.
 
-## Phase 3 — create_report (DAX) + add_dataset
-- [ ] T3.1 `templates/report_skeleton_dax.rdl`
-- [ ] T3.2 DAX branch (CommandText-only; DataField Table[Col]/[Measure])
-- [ ] T3.3 `add_dataset(...)`
-- [ ] T3.4 Verify in Report Builder vs semantic model
+## Phase 3 — create_report (DAX) + add_dataset  ✅ (pending user RB check)
+- [x] T3.1 No separate DAX skeleton needed — create_report builds the datasource into the empty
+      SQL skeleton; templates clear+rebuild theirs. DAX lives in the shared builder.
+- [x] T3.2 DAX source: `_SOURCE_CONFIG['dax']` (PBIDATASET); `_build_connect_string` dax branch
+      (pbiazure + Identity Provider + ClaimsToken); `_add_datasource` emits rd:PowerBIWorkspaceName /
+      rd:PowerBIDatasetName. DataField caller-provided (Table[Col]/[Measure]); DAX skips @QueryParameters.
+      Works for create_report AND all 6 templates (shared builder + connection passthrough).
+- [x] T3.3 `add_dataset(filepath, dataset_name, query, fields, datasource_name?)` — append a dataset
+      bound to an existing data source (e.g. parameter-value lookups). 20 tools total.
+- [x] tests: 30 pass (DAX create_report/template, connect-string override, add_dataset + dup guard).
+- [~] T3.4 **PENDING USER:** open a DAX-sourced report in Report Builder against a real Power BI
+      semantic model (needs the real connect string / workspace + dataset names).
 
 ## Phase 4 — add_matrix (1×1×1)
 - [ ] T4.1 `templates/matrix_skeleton.xml` from Weekly Enrollment Trend
