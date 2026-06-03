@@ -4,6 +4,36 @@ Durable task tracker for the multi-session build. **Read this first each session
 after every completed task (check the box, add a one-line note + commit hash). Full plan:
 `C:\Users\vhuyd\.claude\plans\ethereal-doodling-nest.md`.
 
+> ## ▶ NEXT SESSION — Phase SB: Strategy B (edit EXISTING reports)
+> **Goal:** tools to modify a matrix already in an .rdl — add/remove a row group, a column
+> group, and a value (measure) column/row. (Templates so far only *generate*; this *edits*.)
+>
+> **State to date:** Phases 0–3 + 6-template library DONE, RB-verified, documented, pushed.
+> 20 tools, 30 tests, repo = `Script/rdl_mcp_extend` (origin viethuydoan/rdl_mcp_extend, main).
+> Read README.md + docs/TEMPLATES.md for the API; tests/ for patterns.
+>
+> **Reuse (already built):** `templates_lib._find_tablix`, `_find_member_by_group`,
+> `_rebind_group`, `_rebind_matrix_region`; `columns._update_tablix_width`,
+> `columns._create_table_cell`; base `columns.add_column/remove_column` (flat tables only).
+>
+> **The hard part / RDL facts:** a matrix = TablixCorner + TablixColumnHierarchy +
+> TablixRowHierarchy (nested TablixMembers w/ Group) + TablixBody grid (#cols = leaf column
+> members, #rows = leaf row members). Editing means keeping corner/hierarchy/body in sync:
+> - add ROW group → insert a nested `TablixMember`(Group) in row hierarchy + a `TablixColumn`
+>   (row-header) + a header cell per body row + a corner cell band; recompute width.
+> - add COLUMN group → symmetric on column hierarchy + a `TablixCorner` band + replicate data
+>   cells under the new group.
+> - add VALUE → new data textbox cell in the innermost column-group body + its header/corner.
+> - remove_* = inverses. Every `Name=` must stay globally unique.
+>
+> **Methodology (unchanged):** ask user to author a BEFORE and AFTER in Report Builder; diff
+> the two to learn the exact XML delta; implement to reproduce it; test (build→validate→assert);
+> user RB-verifies. Likely new module `matrix_edit.py`; tools add_matrix_row_group /
+> add_matrix_column_group / add_matrix_value / remove_*. First ask: get a before/after pair
+> (start with "add a value column to an existing simple_matrix" — smallest delta).
+> Tasks: SB.1 before/after sample → SB.2 add_matrix_value → SB.3 add row group → SB.4 add col
+> group → SB.5 removes → SB.6 tests + docs.
+
 Goal: extend `bethmaloney/rdl-mcp` (vendored at `rdl_report_mcp/`) to scaffold new paginated
 reports (Fabric SQLAZURE / plain SQL / Power BI DAX) and author **matrices** (add matrix,
 add value column, add row/column groups). Keep the stdlib JSON-RPC server; keep the RDL
